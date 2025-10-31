@@ -19,6 +19,7 @@ WORKDIR /app
 
 # Copy application files
 COPY temp/* /app
+COPY entrypoint.sh /app
 
 # Install binary
 RUN chmod +x /app/${APP_INSTALLER_FILE}
@@ -28,6 +29,6 @@ RUN rm -f /app/${APP_INSTALLER_FILE}
 # Run setup task
 RUN ${APP_FILE} $APP_SETUP_ARGS
 
-ENTRYPOINT [ "/bin/bash" ]
-# ENTRYPOINT [ "${APP_FILE}" ]
-# CMD ["--help"]
+# ENTRYPOINT [ "/bin/bash" ]
+ENTRYPOINT [ "./entrypoint.sh" ]
+CMD ["--help"]
