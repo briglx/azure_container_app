@@ -38,6 +38,7 @@ Typical system requirements are:
 # Storage Account - Shared Artifacts
 # Storage Account - Application Working Files
 # File Shares - Networked mapped working files
+# Container Registry
 ```
 
 This approach uses a centralized artifact store for binaries. Blob storage account is the artifact store
@@ -110,6 +111,21 @@ docker run -p 5000:5000 "$image_name"
 # Interactive shell
 docker run -it --entrypoint /bin/bash -p 5000:5000  "$image_name"
 
+```
+
+### Push image
+
+```bash
+# Login to remote registry
+docker login -u "$CONTAINER_REGISTRY_USERNAME" -p "$CONTAINER_REGISTRY_PASSWORD" "${CONTAINER_REGISTRY_NAME}.azurecr.io"
+
+# Tag image
+docker tag "${image}:${version}" "${image}:latest"
+docker tag "${image}:${version}" "${CONTAINER_REGISTRY_NAME}.azurecr.io/${CONTAINER_REGISTRY_NAMESPACE}/${image}:${version}"
+docker tag "${image}:latest" "${CONTAINER_REGISTRY_NAME}.azurecr.io/${CONTAINER_REGISTRY_NAMESPACE}/${image}:latest"
+
+docker push "${CONTAINER_REGISTRY_NAME}.azurecr.io/${CONTAINER_REGISTRY_NAMESPACE}/${image}:${version}"
+docker push "${CONTAINER_REGISTRY_NAME}.azurecr.io/${CONTAINER_REGISTRY_NAMESPACE}/${image}:latest"
 ```
 
 # Notes
