@@ -34,20 +34,35 @@ Typical system requirements are:
 * 10GB disk
 
 ```bash
-# Download your binary that needs to be deployed in the container as LOCAL_BINARY_NAME. Upload to a shared artifact location in blob storage
+# Shared Resources
+# Storage Account - Shared Artifacts
+# Storage Account - Application Working Files
+# File Shares - Networked mapped working files
+```
+
+This approach uses a centralized artifact store for binaries. Blob storage account is the artifact store
+```bash
+# Download your binary that needs to be deployed in the container as ARTIFACT_NAME. Upload to a shared artifact location in blob storage
 az storage blob upload \
     --account-name "$COMMON_STORAGE_ACCOUNT" \
     --container-name "$SHARED_CONTAINER" \
-    --name "$TARGET_BINARY_NAME" \
-    --file "$LOCAL_BINARY_NAME"
+    --name "$ARTIFACT_NAME" \
+    --file "$ARTIFACT_NAME"
 ```
 
 ## Build and Deploy the Artifact
 
-Get the path to the artifact
+The build pipeline
+* Fetch artifact
+* Build image
+* Publish Image
+* Deploy Container
+
+### Fetch Artifact
 ```bash
+# Get SAS Key
 set +e
-results=$(az storage container generate-sas \
+SAS_TOKEN=$(az storage container generate-sas \
     --account-name "$COMMON_STORAGE_ACCOUNT" \
     --name "$SHARED_CONTAINER" \
     --permission r \
@@ -56,13 +71,18 @@ results=$(az storage container generate-sas \
     --as-user \
     --output tsv 2>&1)
 set -e
-sas_token="$results"
-# Override if needed
-sas_token="$SAS_TOKEN"
+
+artifact_path="https://${COMMON_STORAGE_ACCOUNT}.blob.core.windows.net/${SHARED_CONTAINER}/${ARTIFACT_FOLDER}/${ARTIFACT_NAME}?${SAS_TOKEN}"
+
+rm -Rf ./temp
+mkdir -p ./temp
+curl -fsSL "${artifact_path}" -o "temp/${ARTIFACT_NAME}"
+unzip -q "${ARTIFACT_NAME}" -d temp
 ```
 
-Build docker image
+### Build docker image
 ```bash
+# Configure image version
 model_name="$MODEL_NAME"
 model_version="$MODEL_VERSION"
 image="${model_name}_v${model_version}"
@@ -75,9 +95,14 @@ image_name="${image}:${version}"
 
 project_root=$(git rev-parse --show-toplevel)
 dockerfile_path="${project_root}/Dockerfile"
-artifact_path="https://${COMMON_STORAGE_ACCOUNT}.blob.core.windows.net/${SHARED_CONTAINER}/${ARTIFACT_FOLDER}/${TARGET_BINARY_NAME}?${sas_token}"
+
 # Build image
-docker build --build-arg "ARTIFACT_PATH=$artifact_path" --build-arg "RELEASE_VERSION=$version" -t "$image_name" -f "${dockerfile_path}" "${project_root}"
+DOCKER_BUILDKIT=1 docker buildx build \
+    --build-arg "RELEASE_VERSION=$version" \
+    --build-arg "APP_INSTALLER_FILE=$APP_INSTALLER_FILE" \
+    --build-arg "APP_FILE=$APP_FILE" \
+    --build-arg "APP_SETUP_ARGS=$APP_SETUP_ARGS"  \
+    -t "$image_name" -f "${dockerfile_path}" "${project_root}"
 
 # Run container
 docker run -p 5000:5000 "$image_name"
@@ -85,5 +110,52 @@ docker run -p 5000:5000 "$image_name"
 # Interactive shell
 docker run -it --entrypoint /bin/bash -p 5000:5000  "$image_name"
 
+```
+
+# Notes
+
+Mounting network files in docker 
+
+* At build time
+* At run time
+
+```bash
+# Get network storage key 
+set +e
+NETWORK_SHARE_STORAGE_KEY=$(az storage account keys list \
+    --resource-group "$NETWORK_SHARE_RESOURCE_GROUP" \
+    --account-name "$NETWORK_SHARE_STORAGE_ACCOUNT" \
+    --query "[0].value" \
+    --output tsv 2>&1)
+set -e
+
+
+# At Build Time -----------------------------------------------------------------------------------
+echo "$NETWORK_SHARE_STORAGE_KEY" > storage_key.txt
+DOCKER_BUILDKIT=1 docker buildx build \
+    --secret id=storage_key,src=storage_key.txt \
+    --build-arg "RELEASE_VERSION=$version" \
+    --build-arg "NETWORK_SHARE_STORAGE_ACCOUNT=$NETWORK_SHARE_STORAGE_ACCOUNT" \
+    --build-arg "APP_INSTALLER_FILE=$APP_INSTALLER_FILE" \
+    --build-arg "APP_FILE=$APP_FILE" \
+    --build-arg "APP_SETUP_ARGS=$APP_SETUP_ARGS"  \
+    -t "$image_name" -f "${dockerfile_path}" "${project_root}"
+rm storage_key.txt
+
+# Docker file has
+RUN --mount=type=secret,id=storage_key mount -t cifs "//${NETWORK_SHARE_STORAGE_ACCOUNT}.file.core.windows.net/share" \
+        /mnt/azurefiles \
+        -o "vers=3.0,username=${NETWORK_SHARE_STORAGE_ACCOUNT},password=$(cat /run/secrets/storage_key),dir_mode=0777,file_mode=0777,serverino"
+
+# At Run Time - mount on host and run with volumn ------------------------------------------------
+sudo mkdir -p /mnt/azurefiles 
+sudo mount -t cifs //${NETWORK_SHARE_STORAGE_ACCOUNT}.file.core.windows.net/share \
+    /mnt/azurefiles \
+    -o "vers=3.0,username=${NETWORK_SHARE_STORAGE_ACCOUNT},password="$NETWORK_SHARE_STORAGE_KEY",dir_mode=0777,file_mode=0777,serverino"
+
+docker run -p 5000:5000 -v /mnt/azurefiles:/mnt/azurefiles "$image_name"
+
+# Interactive shell
+docker run -it --entrypoint /bin/bash -p 5000:5000  -v /mnt/azurefiles:/mnt/azurefiles "$image_name"
 
 ```
