@@ -23,7 +23,7 @@ cp example.env .env
 [ -f .env ] && while IFS= read -r line; do [[ $line =~ ^[^#]*= ]] && eval "export $line"; done < .env
 
 # Login to az. Only required once per install.
-az login --tenant $AZURE_TENANT_ID
+az login --tenant $AZURE_TENANT_ID --use-device-code
 ```
 
 ## Provision Resources
@@ -99,6 +99,7 @@ dockerfile_path="${project_root}/Dockerfile"
 
 # Build image
 DOCKER_BUILDKIT=1 docker buildx build \
+    --platform linux/amd64 \
     --build-arg "RELEASE_VERSION=$version" \
     --build-arg "APP_INSTALLER_FILE=$APP_INSTALLER_FILE" \
     --build-arg "APP_FILE=$APP_FILE" \
@@ -126,6 +127,30 @@ docker tag "${image}:latest" "${CONTAINER_REGISTRY_NAME}.azurecr.io/${CONTAINER_
 
 docker push "${CONTAINER_REGISTRY_NAME}.azurecr.io/${CONTAINER_REGISTRY_NAMESPACE}/${image}:${version}"
 docker push "${CONTAINER_REGISTRY_NAME}.azurecr.io/${CONTAINER_REGISTRY_NAMESPACE}/${image}:latest"
+```
+
+### Deploy to Azure Container Instance
+```bash
+az container delete \
+    --resource-group "$ACI_RESOURCE_GROUP" \
+    --name "$ACI_NAME" \
+    --yes
+
+az container create \
+  --resource-group "$ACI_RESOURCE_GROUP" \
+  --name "$ACI_NAME" \
+  --image "${CONTAINER_REGISTRY_NAME}.azurecr.io/${CONTAINER_REGISTRY_NAMESPACE}/${MODEL_NAME}_${MODEL_VERSION}:latest" \
+  --cpu 1 --memory 1 \
+  --restart-policy Never \
+  --os-type Linux \
+  --registry-login-server "${CONTAINER_REGISTRY_NAME}.azurecr.io" \
+  --registry-username "$CONTAINER_REGISTRY_USERNAME" \
+  --registry-password "$CONTAINER_REGISTRY_PASSWORD"
+
+az container show \
+    --resource-group "$ACI_RESOURCE_GROUP" \
+    --name "$ACI_NAME" \
+    --query 'containers[0].instanceView.currentState.exitCode'
 ```
 
 # Notes

@@ -23,3 +23,6 @@ format_print ""
 format_print "${APP_FILE} -help"
 ${APP_FILE} -help
 format_print ""
+
+format_print "Waiting for 10 minutes to allow for inspection..."
+sleep 600
