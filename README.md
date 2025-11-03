@@ -160,13 +160,18 @@ az container create \
 az container show \
     --resource-group "$ACI_RESOURCE_GROUP" \
     --name "$ACI_NAME" \
-    --query 'containers[0].instanceView.currentState.exitCode'
+    --query 'containers[0].instanceView.currentState.state'
 
 # Interactive shell
 az container exec \
   --resource-group "$ACI_RESOURCE_GROUP" \
   --name "$ACI_NAME" \
   --exec-command "/bin/bash"
+
+# Start Container after termination
+az container start \
+  --resource-group "$ACI_RESOURCE_GROUP" \
+  --name "$ACI_NAME" 
 ```
 
 # Notes
