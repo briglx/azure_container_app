@@ -4,7 +4,7 @@ Example project demonstraiting container apps that use a binary from an azure st
 
 # Getting Started
 
-Configre the environment variables. Copy `example.env` to `.env` and update the values.
+Configure the environment variables. Copy `example.env` to `.env` and update the values.
 
 ## Create System Identities
 
@@ -108,14 +108,8 @@ DOCKER_BUILDKIT=1 docker buildx build \
     --build-arg "APP_INSTALLER_FILE=$APP_INSTALLER_FILE" \
     --build-arg "APP_FILE=$APP_FILE" \
     --build-arg "APP_SETUP_ARGS=$APP_SETUP_ARGS"  \
+    --build-arg "APP_ALIAS=$APP_ALIAS" \
     -t "$image_name" -f "${dockerfile_path}" "${project_root}"
-
-# Run container
-docker run -p 5000:5000 "$image_name"
-
-# Interactive shell
-docker run -it --entrypoint /bin/bash -p 5000:5000  "$image_name"
-
 ```
 
 ### Push image
@@ -146,7 +140,7 @@ az container create \
     --resource-group "$ACI_RESOURCE_GROUP" \
     --name "$ACI_NAME" \
     --image "${CONTAINER_REGISTRY_NAME}.azurecr.io/${CONTAINER_REGISTRY_NAMESPACE}/${image}:${version}" \
-    --cpu 1 --memory 1 \
+    --cpu 1 --memory 2 \
     --restart-policy Never \
     --os-type Linux \
     --registry-login-server "${CONTAINER_REGISTRY_NAME}.azurecr.io" \
@@ -155,24 +149,74 @@ az container create \
     --azure-file-volume-account-name $NETWORK_SHARE_STORAGE_ACCOUNT \
     --azure-file-volume-account-key $NETWORK_SHARE_STORAGE_KEY \
     --azure-file-volume-share-name "share" \
-    --azure-file-volume-mount-path /mnt/azurefiles
+    --azure-file-volume-mount-path /mnt/azurefiles \
+    --environment-variables APP_RUNTIME_ARGS="$APP_RUNTIME_ARGS" APP_EXPORT_ARGS="$APP_EXPORT_ARGS" APP_LOG_FILE="$APP_LOG_FILE"
+```
 
-az container show \
+# Development
+
+Use the following commands to setup your environment.
+
+```bash
+# Configure the environment variables. Copy example.env to .env and update the values
+cp example.env .env
+
+# load .env vars
+# [ ! -f .env ] || export $(grep -v '^#' .env | xargs)
+# or this version allows variable substitution and quoted long values
+# [ -f .env ] && while IFS= read -r line; do [[ $line =~ ^[^#]*= ]] && eval "export $line"; done < .env
+```
+## Running the Application
+
+Run the application locally after building the image.
+
+```bash
+# Run container locally
+docker run -p 5000:5000 "$image_name"
+
+# Run locally with Interactive shell
+docker run -it --entrypoint /bin/bash -p 5000:5000  "$image_name"
+```
+
+Once your container instance has been deployed, you can manually start it and connect for interactive debugging or runtime inspection.
+
+> **Prerequisite**  
+> Ensure your user or service principal has the following Azure role:  
+> **`Microsoft.ContainerInstance/containerGroups/start/action`**  
+> **`Microsoft.ContainerInstance/containerGroups/containers/exec/action`** 
+> **`Microsoft.ContainerInstance/containerGroups/restart/action`**   
+> These permission are included in the **Contributor** or **Azure Container Instance Contributor** roles.
+
+```bash
+# If the container is in a **Terminated** or **Stopped** state, use the following command to start it:
+az container start \
     --resource-group "$ACI_RESOURCE_GROUP" \
-    --name "$ACI_NAME" \
-    --query 'containers[0].instanceView.currentState.state'
+    --name "$ACI_NAME" 
 
-# Interactive shell
+# Connect to the Running Container with an Interactive shell
 az container exec \
   --resource-group "$ACI_RESOURCE_GROUP" \
   --name "$ACI_NAME" \
   --exec-command "/bin/bash"
 
-# Start Container after termination
-az container start \
-  --resource-group "$ACI_RESOURCE_GROUP" \
-  --name "$ACI_NAME" 
+az container show \
+    --resource-group "$ACI_RESOURCE_GROUP" \
+    --name "$ACI_NAME" \
+    --query 'containers[0].instanceView.currentState.state'
 ```
+
+
+## Style Guidelines
+
+Summary of the most relevant points:
+
+- Comments should be full sentences and end with a period.
+- Constants and the content of lists and dictionaries should be in alphabetical order.
+- It is advisable to adjust IDE or editor settings to match those requirements.
+
+## Testing
+
+TBD
 
 # Notes
 
