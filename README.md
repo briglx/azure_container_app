@@ -35,15 +35,19 @@ Typical system requirements are:
 
 ```bash
 # Shared Resources
-# Storage Account - Shared Artifacts
-# Storage Account - Application Working Files
-# File Shares - Networked mapped working files
-# Container Registry
+    # Container Registry
+    # Storage Account - Shared Artifacts
+# Solution Resources
+    # Azure Container Instance
+    # Storage Account - Application Working Files
+    # File Shares - Networked mapped working files
 ```
 
 This approach uses a centralized artifact store for binaries. Blob storage account is the artifact store
 ```bash
-# Download your binary that needs to be deployed in the container as ARTIFACT_NAME. Upload to a shared artifact location in blob storage
+# Download your binary that needs to be deployed in the container as ARTIFACT_NAME. 
+curl /path/to/files -o "$ARTIFACT_NAME"
+# Upload to a shared artifact location in blob storage
 az storage blob upload \
     --account-name "$COMMON_STORAGE_ACCOUNT" \
     --container-name "$SHARED_CONTAINER" \
@@ -61,7 +65,7 @@ The build pipeline
 
 ### Fetch Artifact
 ```bash
-# Get SAS Key
+# Get Artifact Storage SAS Key
 set +e
 SAS_TOKEN=$(az storage container generate-sas \
     --account-name "$COMMON_STORAGE_ACCOUNT" \
@@ -131,33 +135,48 @@ docker push "${CONTAINER_REGISTRY_NAME}.azurecr.io/${CONTAINER_REGISTRY_NAMESPAC
 
 ### Deploy to Azure Container Instance
 ```bash
+# Remove previous
 az container delete \
     --resource-group "$ACI_RESOURCE_GROUP" \
     --name "$ACI_NAME" \
     --yes
 
+# Create new instance
 az container create \
-  --resource-group "$ACI_RESOURCE_GROUP" \
-  --name "$ACI_NAME" \
-  --image "${CONTAINER_REGISTRY_NAME}.azurecr.io/${CONTAINER_REGISTRY_NAMESPACE}/${MODEL_NAME}_${MODEL_VERSION}:latest" \
-  --cpu 1 --memory 1 \
-  --restart-policy Never \
-  --os-type Linux \
-  --registry-login-server "${CONTAINER_REGISTRY_NAME}.azurecr.io" \
-  --registry-username "$CONTAINER_REGISTRY_USERNAME" \
-  --registry-password "$CONTAINER_REGISTRY_PASSWORD"
+    --resource-group "$ACI_RESOURCE_GROUP" \
+    --name "$ACI_NAME" \
+    --image "${CONTAINER_REGISTRY_NAME}.azurecr.io/${CONTAINER_REGISTRY_NAMESPACE}/${image}:${version}" \
+    --cpu 1 --memory 1 \
+    --restart-policy Never \
+    --os-type Linux \
+    --registry-login-server "${CONTAINER_REGISTRY_NAME}.azurecr.io" \
+    --registry-username "$CONTAINER_REGISTRY_USERNAME" \
+    --registry-password "$CONTAINER_REGISTRY_PASSWORD" \
+    --azure-file-volume-account-name $NETWORK_SHARE_STORAGE_ACCOUNT \
+    --azure-file-volume-account-key $NETWORK_SHARE_STORAGE_KEY \
+    --azure-file-volume-share-name "share" \
+    --azure-file-volume-mount-path /mnt/azurefiles
 
 az container show \
     --resource-group "$ACI_RESOURCE_GROUP" \
     --name "$ACI_NAME" \
     --query 'containers[0].instanceView.currentState.exitCode'
+
+# Interactive shell
+az container exec \
+  --resource-group "$ACI_RESOURCE_GROUP" \
+  --name "$ACI_NAME" \
+  --exec-command "/bin/bash"
 ```
 
 # Notes
 
-Mounting network files in docker 
+Various notes.
 
-* At build time
+## Mounting network files in docker 
+
+* At image build time
+* At container create time
 * At run time
 
 ```bash
@@ -170,8 +189,7 @@ NETWORK_SHARE_STORAGE_KEY=$(az storage account keys list \
     --output tsv 2>&1)
 set -e
 
-
-# At Build Time -----------------------------------------------------------------------------------
+# At Docker Build Time -----------------------------------------------------------------------------------
 echo "$NETWORK_SHARE_STORAGE_KEY" > storage_key.txt
 DOCKER_BUILDKIT=1 docker buildx build \
     --secret id=storage_key,src=storage_key.txt \
@@ -188,6 +206,15 @@ RUN --mount=type=secret,id=storage_key mount -t cifs "//${NETWORK_SHARE_STORAGE_
         /mnt/azurefiles \
         -o "vers=3.0,username=${NETWORK_SHARE_STORAGE_ACCOUNT},password=$(cat /run/secrets/storage_key),dir_mode=0777,file_mode=0777,serverino"
 
+# At Container Create Time - Via Mounting fileshare
+az container create \
+    ... \
+    --azure-file-volume-account-name $NETWORK_SHARE_STORAGE_ACCOUNT \
+    --azure-file-volume-account-key $NETWORK_SHARE_STORAGE_KEY \
+    --azure-file-volume-share-name "share" \
+    --azure-file-volume-mount-path /mnt/azurefiles
+
+
 # At Run Time - mount on host and run with volumn ------------------------------------------------
 sudo mkdir -p /mnt/azurefiles 
 sudo mount -t cifs //${NETWORK_SHARE_STORAGE_ACCOUNT}.file.core.windows.net/share \
@@ -199,4 +226,37 @@ docker run -p 5000:5000 -v /mnt/azurefiles:/mnt/azurefiles "$image_name"
 # Interactive shell
 docker run -it --entrypoint /bin/bash -p 5000:5000  -v /mnt/azurefiles:/mnt/azurefiles "$image_name"
 
+```
+
+## Azure Key Vault
+
+General use
+```bash
+# Verify RBAC auth
+az keyvault show \
+    --name "$KEY_VAULT_NAME" \
+    --query properties.enableRbacAuthorization
+
+# Set role to a user - Dev only use case
+assignee_id=$(az ad signed-in-user show --query id -o tsv)
+az role assignment create \
+  --role "Key Vault Secrets Officer" \
+  --assignee "$assignee_id" \
+  --scope $(az keyvault show --name "$KEY_VAULT_NAME" --query id -o tsv)
+```
+
+Storing and getting secrets
+```bash
+
+# Secret name
+acr_password_name="acr-${CONTAINER_REGISTRY_NAME}-${CONTAINER_REGISTRY_USERNAME}-password"
+
+# Set ACR password
+az keyvault secret set \
+    --vault-name "$KEY_VAULT_NAME" \
+    --name "$acr_password_name" \
+    --value "$CONTAINER_REGISTRY_PASSWORD"
+
+# Get ACR password
+CONTAINER_REGISTRY_PASSWORD=$(az keyvault secret show --vault-name "$KEY_VAULT_NAME" --name "$acr_password_name" --query value -o tsv)
 ```
