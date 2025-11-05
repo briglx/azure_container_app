@@ -34,13 +34,31 @@ Typical system requirements are:
 * 10GB disk
 
 ```bash
-# Shared Resources
-    # Container Registry
-    # Storage Account - Shared Artifacts
-# Solution Resources
-    # Azure Container Instance
-    # Storage Account - Application Working Files
-    # File Shares - Networked mapped working files
+# Shared Resources------------------------
+# Container Registry
+# Storage Account - Shared Artifacts
+# Solution Resources-----------------------
+# Azure Container Instance
+# Storage Account - Application Working Files
+# File Shares - Networked mapped working files
+# Function App
+az functionapp config appsettings set \
+    --name "$FUNC_APP_NAME" \
+    --resource-group "$FUNC_APP_RG" \
+    --settings "APP_STORAGE_CONNECTION=$APP_STORAGE_CONNECTION" \
+        "APP_STORAGE_CONTAINER=$APP_STORAGE_CONTAINER" \
+        "APP_STORAGE_INPUT_PATH=$APP_STORAGE_INPUT_PATH" \
+        "APP_STORAGE_OUTPUT_PATH=$APP_STORAGE_OUTPUT_PATH"
+        
+# Event Grid
+az provider register --namespace Microsoft.EventGrid
+az provider show --namespace Microsoft.EventGrid --query "registrationState"
+
+app_storageid=$(az storage account show --name "$APP_STORAGE_ACCOUNT_NAME" --resource-group "$APP_STORAGE_RG" --query id --output tsv)
+az eventgrid event-subscription create \
+    --source-resource-id "$app_storageid" \
+    --name "$EVENT_SUBSCRIPTION_NAME" \
+    --endpoint "$FUNC_APP_ENDPOINT"
 ```
 
 This approach uses a centralized artifact store for binaries. Blob storage account is the artifact store
@@ -49,8 +67,8 @@ This approach uses a centralized artifact store for binaries. Blob storage accou
 curl /path/to/files -o "$ARTIFACT_NAME"
 # Upload to a shared artifact location in blob storage
 az storage blob upload \
-    --account-name "$COMMON_STORAGE_ACCOUNT" \
-    --container-name "$SHARED_CONTAINER" \
+    --account-name "$ARTIFACT_STORAGE_ACCOUNT" \
+    --container-name "$ARTIFACT_CONTAINER" \
     --name "$ARTIFACT_NAME" \
     --file "$ARTIFACT_NAME"
 ```
@@ -67,9 +85,9 @@ The build pipeline
 ```bash
 # Get Artifact Storage SAS Key
 set +e
-SAS_TOKEN=$(az storage container generate-sas \
-    --account-name "$COMMON_STORAGE_ACCOUNT" \
-    --name "$SHARED_CONTAINER" \
+ARTIFACT_SAS_TOKEN=$(az storage container generate-sas \
+    --account-name "$ARTIFACT_STORAGE_ACCOUNT" \
+    --name "$ARTIFACT_CONTAINER" \
     --permission r \
     --expiry $(date -u -d "1 hour" '+%Y-%m-%dT%H:%MZ') \
     --auth-mode login \
@@ -77,7 +95,7 @@ SAS_TOKEN=$(az storage container generate-sas \
     --output tsv 2>&1)
 set -e
 
-artifact_path="https://${COMMON_STORAGE_ACCOUNT}.blob.core.windows.net/${SHARED_CONTAINER}/${ARTIFACT_FOLDER}/${ARTIFACT_NAME}?${SAS_TOKEN}"
+artifact_path="https://${ARTIFACT_STORAGE_ACCOUNT}.blob.core.windows.net/${ARTIFACT_CONTAINER}/${ARTIFACT_FOLDER}/${ARTIFACT_NAME}?${ARTIFACT_SAS_TOKEN}"
 
 rm -Rf ./temp
 mkdir -p ./temp
@@ -146,8 +164,8 @@ az container create \
     --registry-login-server "${CONTAINER_REGISTRY_NAME}.azurecr.io" \
     --registry-username "$CONTAINER_REGISTRY_USERNAME" \
     --registry-password "$CONTAINER_REGISTRY_PASSWORD" \
-    --azure-file-volume-account-name $NETWORK_SHARE_STORAGE_ACCOUNT \
-    --azure-file-volume-account-key $NETWORK_SHARE_STORAGE_KEY \
+    --azure-file-volume-account-name $APP_STORAGE_ACCOUNT_NAME \
+    --azure-file-volume-account-key $APP_STORAGE_KEY \
     --azure-file-volume-share-name "share" \
     --azure-file-volume-mount-path /mnt/azurefiles \
     --environment-variables APP_RUNTIME_ARGS="$APP_RUNTIME_ARGS" APP_EXPORT_ARGS="$APP_EXPORT_ARGS" APP_LOG_FILE="$APP_LOG_FILE"
@@ -165,6 +183,21 @@ cp example.env .env
 # [ ! -f .env ] || export $(grep -v '^#' .env | xargs)
 # or this version allows variable substitution and quoted long values
 # [ -f .env ] && while IFS= read -r line; do [[ $line =~ ^[^#]*= ]] && eval "export $line"; done < .env
+
+# Create and activate a python virtual environment
+# Windows
+# C:\Users\!Admin\AppData\Local\Programs\Python\Python312\python.exe -m venv .venv
+# .venv\scripts\activate
+
+# Linux
+python3.12 -m venv .venv
+source .venv/bin/activate
+
+# Update pip
+python -m pip install --upgrade pip
+
+# Install dependencies
+pip install -r requirements_dev.txt
 ```
 ## Running the Application
 
@@ -231,19 +264,19 @@ Various notes.
 ```bash
 # Get network storage key 
 set +e
-NETWORK_SHARE_STORAGE_KEY=$(az storage account keys list \
-    --resource-group "$NETWORK_SHARE_RESOURCE_GROUP" \
-    --account-name "$NETWORK_SHARE_STORAGE_ACCOUNT" \
+APP_STORAGE_KEY=$(az storage account keys list \
+    --resource-group "$APP_STORAGE_RG" \
+    --account-name "$APP_STORAGE_ACCOUNT_NAME" \
     --query "[0].value" \
     --output tsv 2>&1)
 set -e
 
 # At Docker Build Time -----------------------------------------------------------------------------------
-echo "$NETWORK_SHARE_STORAGE_KEY" > storage_key.txt
+echo "$APP_STORAGE_KEY" > storage_key.txt
 DOCKER_BUILDKIT=1 docker buildx build \
     --secret id=storage_key,src=storage_key.txt \
     --build-arg "RELEASE_VERSION=$version" \
-    --build-arg "NETWORK_SHARE_STORAGE_ACCOUNT=$NETWORK_SHARE_STORAGE_ACCOUNT" \
+    --build-arg "APP_STORAGE_ACCOUNT_NAME=$APP_STORAGE_ACCOUNT_NAME" \
     --build-arg "APP_INSTALLER_FILE=$APP_INSTALLER_FILE" \
     --build-arg "APP_FILE=$APP_FILE" \
     --build-arg "APP_SETUP_ARGS=$APP_SETUP_ARGS"  \
@@ -251,24 +284,24 @@ DOCKER_BUILDKIT=1 docker buildx build \
 rm storage_key.txt
 
 # Docker file has
-RUN --mount=type=secret,id=storage_key mount -t cifs "//${NETWORK_SHARE_STORAGE_ACCOUNT}.file.core.windows.net/share" \
+RUN --mount=type=secret,id=storage_key mount -t cifs "//${APP_STORAGE_ACCOUNT_NAME}.file.core.windows.net/share" \
         /mnt/azurefiles \
-        -o "vers=3.0,username=${NETWORK_SHARE_STORAGE_ACCOUNT},password=$(cat /run/secrets/storage_key),dir_mode=0777,file_mode=0777,serverino"
+        -o "vers=3.0,username=${APP_STORAGE_ACCOUNT_NAME},password=$(cat /run/secrets/storage_key),dir_mode=0777,file_mode=0777,serverino"
 
 # At Container Create Time - Via Mounting fileshare
 az container create \
     ... \
-    --azure-file-volume-account-name $NETWORK_SHARE_STORAGE_ACCOUNT \
-    --azure-file-volume-account-key $NETWORK_SHARE_STORAGE_KEY \
+    --azure-file-volume-account-name $APP_STORAGE_ACCOUNT_NAME \
+    --azure-file-volume-account-key $APP_STORAGE_KEY \
     --azure-file-volume-share-name "share" \
     --azure-file-volume-mount-path /mnt/azurefiles
 
 
 # At Run Time - mount on host and run with volumn ------------------------------------------------
 sudo mkdir -p /mnt/azurefiles 
-sudo mount -t cifs //${NETWORK_SHARE_STORAGE_ACCOUNT}.file.core.windows.net/share \
+sudo mount -t cifs //${APP_STORAGE_ACCOUNT_NAME}.file.core.windows.net/share \
     /mnt/azurefiles \
-    -o "vers=3.0,username=${NETWORK_SHARE_STORAGE_ACCOUNT},password="$NETWORK_SHARE_STORAGE_KEY",dir_mode=0777,file_mode=0777,serverino"
+    -o "vers=3.0,username=${APP_STORAGE_ACCOUNT_NAME},password="$APP_STORAGE_KEY",dir_mode=0777,file_mode=0777,serverino"
 
 docker run -p 5000:5000 -v /mnt/azurefiles:/mnt/azurefiles "$image_name"
 
