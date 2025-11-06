@@ -1,6 +1,9 @@
-# azure_container_app
+# File Processing Pipeline
 
-Example project demonstraiting container apps that use a binary from an azure storage account
+Example project demonstraiting an automated workflow for file processing. Uploading a file triggers a containerized application that processes the file and writes results back to the storage account. 
+
+
+![Architecture Overview](./docs/architecture_overview.drawio.png)
 
 # Getting Started
 
