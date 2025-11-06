@@ -3,7 +3,6 @@
 # Enable strict mode.
 set -euo pipefail
 
-SCRIPT_PATH=$(dirname $(realpath -s "$0"))
 build_number=$(date +%Y%m%dT%H%M)
 
 format_print () {
@@ -27,30 +26,48 @@ format_print "######################################################"
 format_print "Runtime Information - Instance ENVS"
 format_print "######################################################"
 format_print ""
-format_print "APP_RUNTIME_ARGS = ${APP_RUNTIME_ARGS:-undefined}"
-format_print "APP_EXPORT_ARGS = ${APP_EXPORT_ARGS:-undefined}"
+format_print "APP_RUNTIME_CONFIG_FILE = ${APP_RUNTIME_CONFIG_FILE:-undefined}"
+format_print "APP_EXPORT_CONFIG_FILE = ${APP_EXPORT_CONFIG_FILE:-undefined}"
 format_print "APP_LOG_FILE = ${APP_LOG_FILE:-undefined}"
 format_print ""
 
 format_print "Verify application..."
 format_print "${APP_FILE} -help"
-${APP_FILE} -help
+${APP_FILE} -help | head -n 1
 format_print ""
 
 format_print "Watch log file..."
-tail -n 0 -f "$APP_LOG_FILE" >&2 &
+tail -n 0 -f "$APP_LOG_FILE" | tee -a "/mnt/azurefiles/log_${build_number}.log" >&2 &
+sleep 5
+
+# format_print "Build runtime args..."
+APP_RUNTIME_ARGS_STRING=$(./build_args.sh "$APP_RUNTIME_CONFIG_FILE")
+RUNTIME_ARGS_WITH_FILENAME="${APP_RUNTIME_ARGS_STRING//__OUTPUT__/output_${build_number}.acgd}"
+
+eval "set -- $RUNTIME_ARGS_WITH_FILENAME"
+APP_RUNTIME_ARGS_ARRAY=("$@")
+
+printf 'Parsed %d args:\n' "${#APP_RUNTIME_ARGS_ARRAY[@]}"
+printf '  [%s]\n' "${APP_RUNTIME_ARGS_ARRAY[@]}"
 
 format_print "Starting batch run..."
-RUNTIME_ARGS_WITH_FILENAME="${APP_RUNTIME_ARGS//__OUTPUT__/output_${build_number}.acgd}"
-format_print "$APP_FILE $RUNTIME_ARGS_WITH_FILENAME"
-read -r -a ARGS_ARRAY <<< "$RUNTIME_ARGS_WITH_FILENAME"
-"$APP_FILE" "${ARGS_ARRAY[@]}" 2>&1
+format_print "$APP_FILE ${APP_RUNTIME_ARGS_ARRAY[*]}"
+"$APP_FILE" "${APP_RUNTIME_ARGS_ARRAY[@]}" 2>&1
 
 format_print "Export data to file..."
-EXPORT_ARGS_WITH_FILENAME="${APP_EXPORT_ARGS//__OUTPUT__/output_${build_number}.acgd}"
+
+format_print "Build export args..."
+APP_EXPORT_ARGS_STRING=$(./build_args.sh "$APP_EXPORT_CONFIG_FILE")
+EXPORT_ARGS_WITH_FILENAME="${APP_EXPORT_ARGS_STRING//__OUTPUT__/output_${build_number}.acgd}"
 EXPORT_ARGS_WITH_FILENAME="${EXPORT_ARGS_WITH_FILENAME//__EXPORT__/export_${build_number}.txt}"
-format_print "$APP_FILE $EXPORT_ARGS_WITH_FILENAME"
-read -r -a EXPORT_ARGS_ARRAY <<< "$EXPORT_ARGS_WITH_FILENAME"
+
+eval "set -- $EXPORT_ARGS_WITH_FILENAME"
+EXPORT_ARGS_ARRAY=("$@")
+
+printf 'Parsed %d args:\n' "${#EXPORT_ARGS_ARRAY[@]}"
+printf '  [%s]\n' "${EXPORT_ARGS_ARRAY[@]}"
+
+format_print "$APP_FILE ${EXPORT_ARGS_ARRAY[*]}"
 "$APP_FILE" "${EXPORT_ARGS_ARRAY[@]}" 2>&1
 
 format_print "Copy file to share."

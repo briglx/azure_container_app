@@ -1,0 +1,5 @@
+{
+    "export": "all",
+    "input_file_name": "__OUTPUT__",
+    "output_file_name": "__EXPORT__"
+  }

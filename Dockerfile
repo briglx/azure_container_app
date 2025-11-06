@@ -1,4 +1,5 @@
-FROM openjdk:21-slim-bullseye
+# FROM openjdk:21-slim-bullseye
+FROM mcr.microsoft.com/openjdk/jdk:21-ubuntu
 
 ARG RELEASE_VERSION=0.0.0
 ARG APP_INSTALLER_FILE=installer.bin
@@ -16,16 +17,17 @@ ENV RELEASE_VERSION=${RELEASE_VERSION} \
 
 RUN echo 'alias ll='"'"'ls $LS_OPTIONS -al'"'"'' >> ~/.bashrc
 
-# Install Java and other dependencies
+# Install dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    vim \
- && rm -rf /var/lib/apt/lists/*
+        jq \
+        vim \
+    && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
 WORKDIR /app
 
 # Copy application files
-COPY temp/* /app
+COPY .artifact_cache/* /app
 
 # Install binary
 RUN chmod +x /app/${APP_INSTALLER_FILE}
@@ -38,7 +40,8 @@ RUN ${APP_FILE} $APP_SETUP_ARGS
 # Set symnlink
 RUN ln -s "${APP_FILE}" "/usr/local/bin/$APP_ALIAS"
 
-COPY entrypoint.sh /app
+COPY entrypoint.sh build_args.sh /app/
+
 # ENTRYPOINT [ "/bin/bash" ]
 ENTRYPOINT [ "./entrypoint.sh" ]
 CMD ["--help"]

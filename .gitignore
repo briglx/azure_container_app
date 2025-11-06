@@ -18,4 +18,8 @@ local.settings.json
 .venv
 .env
 *.zip
-temp
+.artifact_cache
+
+# Config files
+runtime-config.json
+export-config.json

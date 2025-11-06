@@ -1,0 +1,18 @@
+[project]
+name = "azure_container_app"
+version = "2025.11.1"
+license = { text = "MIT" }
+description = "A example project deploying containers"
+readme = "README.md"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+requires-python = ">=3.12.0"
+dependencies = []
+
+[tool.codespell]
+count = ''
+quiet-level = 3
+skip = './.*,*.csv,*.json,*.pyc,./docs/_build/*,./htmlcov/*,*.workbook,*.egg-info,./.artifact_cache'

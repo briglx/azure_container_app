@@ -97,10 +97,10 @@ set -e
 
 artifact_path="https://${ARTIFACT_STORAGE_ACCOUNT}.blob.core.windows.net/${ARTIFACT_CONTAINER}/${ARTIFACT_FOLDER}/${ARTIFACT_NAME}?${ARTIFACT_SAS_TOKEN}"
 
-rm -Rf ./temp
-mkdir -p ./temp
-curl -fsSL "${artifact_path}" -o "temp/${ARTIFACT_NAME}"
-unzip -q "${ARTIFACT_NAME}" -d temp
+rm -Rf ./.artifact_cache
+mkdir -p ./.artifact_cache
+curl -fsSL "${artifact_path}" -o ".artifact_cache/${ARTIFACT_NAME}"
+unzip -q "${ARTIFACT_NAME}" -d .artifact_cache
 ```
 
 ### Build docker image
@@ -168,7 +168,10 @@ az container create \
     --azure-file-volume-account-key $APP_STORAGE_KEY \
     --azure-file-volume-share-name "share" \
     --azure-file-volume-mount-path /mnt/azurefiles \
-    --environment-variables APP_RUNTIME_ARGS="$APP_RUNTIME_ARGS" APP_EXPORT_ARGS="$APP_EXPORT_ARGS" APP_LOG_FILE="$APP_LOG_FILE"
+    --environment-variables \
+        APP_RUNTIME_CONFIG_FILE="$APP_RUNTIME_CONFIG_FILE" \
+        APP_EXPORT_CONFIG_FILE="$APP_EXPORT_CONFIG_FILE" \
+        APP_LOG_FILE="$APP_LOG_FILE"
 ```
 
 # Development
@@ -249,7 +252,11 @@ Summary of the most relevant points:
 
 ## Testing
 
-TBD
+```bash
+# Run linters outside of pre-commit
+codespell
+shellcheck -x *.sh
+```
 
 # Notes
 
@@ -297,7 +304,7 @@ az container create \
     --azure-file-volume-mount-path /mnt/azurefiles
 
 
-# At Run Time - mount on host and run with volumn ------------------------------------------------
+# At Run Time - mount on host and run with volume ------------------------------------------------
 sudo mkdir -p /mnt/azurefiles 
 sudo mount -t cifs //${APP_STORAGE_ACCOUNT_NAME}.file.core.windows.net/share \
     /mnt/azurefiles \
