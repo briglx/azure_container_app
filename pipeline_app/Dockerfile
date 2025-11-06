@@ -40,8 +40,6 @@ RUN ${APP_FILE} $APP_SETUP_ARGS
 # Set symnlink
 RUN ln -s "${APP_FILE}" "/usr/local/bin/$APP_ALIAS"
 
-COPY entrypoint.sh build_args.sh /app/
+COPY ./pipeline_app/entrypoint.sh ./pipeline_app/build_args.sh /app/
 
-# ENTRYPOINT [ "/bin/bash" ]
 ENTRYPOINT [ "./entrypoint.sh" ]
-CMD ["--help"]

@@ -44,6 +44,11 @@ Typical system requirements are:
 # Azure Container Instance
 # Storage Account - Application Working Files
 # File Shares - Networked mapped working files
+az storage share create \
+    --account-name "$APP_STORAGE_ACCOUNT_NAME" \
+    --account-key "$APP_STORAGE_KEY" \
+    --name share
+
 # Function App
 az functionapp config appsettings set \
     --name "$FUNC_APP_NAME" \
@@ -82,6 +87,7 @@ The build pipeline
 * Fetch artifact
 * Build image
 * Publish Image
+* Deploy Configs
 * Deploy Container
 
 ### Fetch Artifact
@@ -100,8 +106,8 @@ set -e
 
 artifact_path="https://${ARTIFACT_STORAGE_ACCOUNT}.blob.core.windows.net/${ARTIFACT_CONTAINER}/${ARTIFACT_FOLDER}/${ARTIFACT_NAME}?${ARTIFACT_SAS_TOKEN}"
 
-rm -Rf ./.artifact_cache
-mkdir -p ./.artifact_cache
+rm -Rf .artifact_cache
+mkdir -p .artifact_cache
 curl -fsSL "${artifact_path}" -o ".artifact_cache/${ARTIFACT_NAME}"
 unzip -q "${ARTIFACT_NAME}" -d .artifact_cache
 ```
@@ -120,7 +126,7 @@ version="${proj_version}.dev${build_number}"
 image_name="${image}:${version}"
 
 project_root=$(git rev-parse --show-toplevel)
-dockerfile_path="${project_root}/Dockerfile"
+dockerfile_path="${project_root}/pipeline_app/Dockerfile"
 
 # Build image
 DOCKER_BUILDKIT=1 docker buildx build \
@@ -146,6 +152,22 @@ docker tag "${image}:latest" "${CONTAINER_REGISTRY_NAME}.azurecr.io/${CONTAINER_
 
 docker push "${CONTAINER_REGISTRY_NAME}.azurecr.io/${CONTAINER_REGISTRY_NAMESPACE}/${image}:${version}"
 docker push "${CONTAINER_REGISTRY_NAME}.azurecr.io/${CONTAINER_REGISTRY_NAMESPACE}/${image}:latest"
+```
+
+### Deploy Configs
+```bash
+# Copy app configs to storage share
+az storage file upload \
+    --source "$LOCAL_APP_RUNTIME_CONFIG_FILE" \
+    --share-name share \
+    --account-key "$APP_STORAGE_KEY" \
+    --account-name "$APP_STORAGE_ACCOUNT_NAME"
+
+az storage file upload \
+    --source "$LOCAL_APP_EXPORT_CONFIG_FILE" \
+    --share-name share \
+    --account-key "$APP_STORAGE_KEY" \
+    --account-name "$APP_STORAGE_ACCOUNT_NAME"
 ```
 
 ### Deploy to Azure Container Instance
@@ -243,7 +265,6 @@ az container show \
     --name "$ACI_NAME" \
     --query 'containers[0].instanceView.currentState.state'
 ```
-
 
 ## Style Guidelines
 

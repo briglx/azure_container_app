@@ -31,6 +31,11 @@ format_print "APP_EXPORT_CONFIG_FILE = ${APP_EXPORT_CONFIG_FILE:-undefined}"
 format_print "APP_LOG_FILE = ${APP_LOG_FILE:-undefined}"
 format_print ""
 
+if [ "$1" = "debug" ]; then
+    format_print "Debug mode enabled, starting bash shell..."
+    exec /bin/bash
+fi
+
 format_print "Verify application..."
 format_print "${APP_FILE} -help"
 ${APP_FILE} -help | head -n 1
@@ -73,7 +78,3 @@ format_print "$APP_FILE ${EXPORT_ARGS_ARRAY[*]}"
 format_print "Copy file to share."
 format_print "cp export_${build_number}.txt /mnt/azurefiles/scoredata/export_${build_number}.txt"
 cp "export_${build_number}.txt" "/mnt/azurefiles/scoredata/export_${build_number}.txt"
-format_print ""
-
-format_print "Waiting to allow for interactive shell..."
-tail -f /dev/null
