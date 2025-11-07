@@ -31,11 +31,6 @@ format_print "APP_EXPORT_CONFIG_FILE = ${APP_EXPORT_CONFIG_FILE:-undefined}"
 format_print "APP_LOG_FILE = ${APP_LOG_FILE:-undefined}"
 format_print ""
 
-if [ "$1" = "debug" ]; then
-    format_print "Debug mode enabled, starting bash shell..."
-    exec /bin/bash
-fi
-
 format_print "Verify application..."
 format_print "${APP_FILE} -help"
 ${APP_FILE} -help | head -n 1
