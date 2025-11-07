@@ -17,6 +17,7 @@ on:
 jobs:
     fetch_artifact:
         runs-on: ubuntu-latest
+        environment: dev
         steps:
             - name: Check out code from GitHub
               uses: actions/checkout@v4.1.1
