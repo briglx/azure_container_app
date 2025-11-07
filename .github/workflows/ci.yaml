@@ -15,7 +15,7 @@ on:
                 type: boolean
 
 jobs:
-    fetch_artifact:
+    build_and_push:
         runs-on: ubuntu-latest
         environment: dev
         steps:
@@ -51,6 +51,9 @@ jobs:
                 build_number=$(date +%Y%m%dT%H%M)
                 version="${proj_version}.dev${build_number}"
 
+                echo "IMAGE=${image}" >> $GITHUB_ENV
+                echo "IMAGE_VERSION=${version}" >> $GITHUB_ENV
+
                 image_name="${image}:${version}"
 
                 project_root=$(git rev-parse --show-toplevel)
@@ -76,6 +79,8 @@ jobs:
             - name: Push Image
               run: |
                 # Tag image
+                image="${{ env.IMAGE }}"
+                version="${{ env.IMAGE_VERSION }}"
                 docker tag "${image}:${version}" "${image}:latest"
                 docker tag "${image}:${version}" "${{ vars.CONTAINER_REGISTRY_NAME }}.azurecr.io/${{ vars.CONTAINER_REGISTRY_NAMESPACE }}/${image}:${version}"
                 docker tag "${image}:latest" "${{ vars.CONTAINER_REGISTRY_NAME }}.azurecr.io/${{ vars.CONTAINER_REGISTRY_NAMESPACE }}/${image}:latest"
