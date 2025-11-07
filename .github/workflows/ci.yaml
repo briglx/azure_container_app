@@ -30,8 +30,8 @@ jobs:
                 project_name=$(cat "${project_root}/pyproject.toml" | grep -oP '(?<=^name = ")[^"]+' | tr -d '\n')
                 project_version=$(cat "${project_root}/pyproject.toml" | grep -oP '(?<=^version = ")[^"]+' | tr -d '\n')
 
-                echo "project_name=${project_name}" >> $GITHUB_OUTPUT
-                echo "project_version=${project_version}" >> $GITHUB_OUTPUT
+                echo "PROJECT_NAME=${project_name}" >> $GITHUB_ENV
+                echo "PROJECT_VERSION=${project_version}" >> $GITHUB_ENV
 
             - name: Fetch Artifacts
               run: |
@@ -47,7 +47,7 @@ jobs:
                 model_version="${{ vars.MODEL_VERSION }}"
                 image="${model_name}_v${model_version}"
 
-                proj_version="${{ needs.info.outputs.project_version }}"
+                proj_version="${{ env.PROJECT_VERSION }}"
                 build_number=$(date +%Y%m%dT%H%M)
                 version="${proj_version}.dev${build_number}"
 
