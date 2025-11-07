@@ -197,6 +197,7 @@ az container create \
     --environment-variables \
         APP_RUNTIME_CONFIG_FILE="$APP_RUNTIME_CONFIG_FILE" \
         APP_EXPORT_CONFIG_FILE="$APP_EXPORT_CONFIG_FILE" \
+        APP_STATS_CONFIG_FILE="$APP_STATS_CONFIG_FILE" \
         APP_LOG_FILE="$APP_LOG_FILE"
 ```
 

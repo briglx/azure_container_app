@@ -28,6 +28,7 @@ format_print "######################################################"
 format_print ""
 format_print "APP_RUNTIME_CONFIG_FILE = ${APP_RUNTIME_CONFIG_FILE:-undefined}"
 format_print "APP_EXPORT_CONFIG_FILE = ${APP_EXPORT_CONFIG_FILE:-undefined}"
+format_print "APP_STATS_CONFIG_FILE = ${APP_STATS_CONFIG_FILE:-undefined}"
 format_print "APP_LOG_FILE = ${APP_LOG_FILE:-undefined}"
 format_print ""
 
