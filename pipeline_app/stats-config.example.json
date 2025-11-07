@@ -1,0 +1,8 @@
+{
+    "file_name": "__OUTPUT__",
+    "name": "the resource name",
+    "location": "sample location",
+    "query": "JMESPath query to filter data",
+    "output": "json",
+    "skip": ""
+  }

@@ -157,17 +157,18 @@ docker push "${CONTAINER_REGISTRY_NAME}.azurecr.io/${CONTAINER_REGISTRY_NAMESPAC
 ### Deploy Configs
 ```bash
 # Copy app configs to storage share
-az storage file upload \
-    --source "$LOCAL_APP_RUNTIME_CONFIG_FILE" \
-    --share-name share \
-    --account-key "$APP_STORAGE_KEY" \
-    --account-name "$APP_STORAGE_ACCOUNT_NAME"
-
-az storage file upload \
-    --source "$LOCAL_APP_EXPORT_CONFIG_FILE" \
-    --share-name share \
-    --account-key "$APP_STORAGE_KEY" \
-    --account-name "$APP_STORAGE_ACCOUNT_NAME"
+config_files=(
+    "$LOCAL_APP_RUNTIME_CONFIG_FILE"
+    "$LOCAL_APP_EXPORT_CONFIG_FILE"
+    "$LOCAL_APP_STATS_CONFIG_FILE"
+)
+for config_file in "${config_files[@]}"; do
+    az storage file upload \
+        --source "$config_file" \
+        --share-name share \
+        --account-key "$APP_STORAGE_KEY" \
+        --account-name "$APP_STORAGE_ACCOUNT_NAME"
+done
 ```
 
 ### Deploy to Azure Container Instance

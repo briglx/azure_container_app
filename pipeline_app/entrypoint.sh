@@ -75,6 +75,27 @@ printf '  [%s]\n' "${EXPORT_ARGS_ARRAY[@]}"
 format_print "$APP_FILE ${EXPORT_ARGS_ARRAY[*]}"
 "$APP_FILE" "${EXPORT_ARGS_ARRAY[@]}" 2>&1
 
-format_print "Copy file to share."
+format_print "Copy export file to share."
 format_print "cp export_${build_number}.txt /mnt/azurefiles/scoredata/export_${build_number}.txt"
 cp "export_${build_number}.txt" "/mnt/azurefiles/scoredata/export_${build_number}.txt"
+
+format_print "Export Statistics"
+format_print "Build statistics args..."
+APP_STATS_ARGS_STRING=$(./build_args.sh "$APP_STATS_CONFIG_FILE")
+EXPORT_STATS_WITH_FILENAME="${APP_STATS_ARGS_STRING//__OUTPUT__/output_${build_number}.acgd}"
+EXPORT_STATS_WITH_FILENAME="${EXPORT_STATS_WITH_FILENAME//__STATS__/stats_${build_number}.txt}"
+
+eval "set -- $EXPORT_STATS_WITH_FILENAME"
+STATS_ARGS_ARRAY=("$@")
+
+printf 'Parsed %d args:\n' "${#STATS_ARGS_ARRAY[@]}"
+printf '  [%s]\n' "${STATS_ARGS_ARRAY[@]}"
+
+format_print "$APP_FILE ${STATS_ARGS_ARRAY[*]}"
+"$APP_FILE" "${STATS_ARGS_ARRAY[@]}" 2>&1
+
+format_print "Copy stats file to share."
+format_print "cp stats_${build_number}.txt /mnt/azurefiles/scoredata/stats_${build_number}.txt"
+cp "stats_${build_number}.txt" "/mnt/azurefiles/scoredata/stats_${build_number}.txt"
+
+format_print "Batch run completed."
