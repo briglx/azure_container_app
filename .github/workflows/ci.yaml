@@ -37,7 +37,7 @@ jobs:
               run: |
                 artifact_path="https://${{ vars.ARTIFACT_STORAGE_ACCOUNT }}.blob.core.windows.net/${{ vars.ARTIFACT_CONTAINER }}/${{ vars.ARTIFACT_FOLDER }}/${{ vars.ARTIFACT_NAME }}?${{ secrets.ARTIFACT_SAS_TOKEN }}"
                 mkdir -p .artifact_cache
-                curl -fsSL "${artifact_path}" -o ".artifact_cache/${{ vars.ARTIFACT_NAME }}"
+                curl -fsSL "${artifact_path}" -o "${{ vars.ARTIFACT_NAME }}"
                 unzip -q "${{ vars.ARTIFACT_NAME }}" -d .artifact_cache
 
             - name: Build docker image

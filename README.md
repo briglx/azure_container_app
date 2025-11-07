@@ -108,7 +108,7 @@ artifact_path="https://${ARTIFACT_STORAGE_ACCOUNT}.blob.core.windows.net/${ARTIF
 
 rm -Rf .artifact_cache
 mkdir -p .artifact_cache
-curl -fsSL "${artifact_path}" -o ".artifact_cache/${ARTIFACT_NAME}"
+curl -fsSL "${artifact_path}" -o "${ARTIFACT_NAME}"
 unzip -q "${ARTIFACT_NAME}" -d .artifact_cache
 ```
 
