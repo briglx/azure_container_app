@@ -1,0 +1,83 @@
+name: CI
+run-name: "${{ github.event_name == 'workflow_dispatch' && format('CI: {0}', github.ref_name) || '' }}"
+
+on:
+    push:
+        branches:
+            - dev
+            - main
+    pull_request: ~
+    workflow_dispatch:
+        inputs:
+            full:
+                description: "Full run (regardless of changes)"
+                default: false
+                type: boolean
+
+jobs:
+    fetch_artifact:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Check out code from GitHub
+              uses: actions/checkout@v4.1.1
+
+            - name: Set common variables
+              id: set-env
+              run: |
+                echo "Setting common environment variables"
+                project_root="${{ github.workspace }}"
+                project_name=$(cat "${project_root}/pyproject.toml" | grep -oP '(?<=^name = ")[^"]+' | tr -d '\n')
+                project_version=$(cat "${project_root}/pyproject.toml" | grep -oP '(?<=^version = ")[^"]+' | tr -d '\n')
+
+                echo "project_name=${project_name}" >> $GITHUB_OUTPUT
+                echo "project_version=${project_version}" >> $GITHUB_OUTPUT
+
+            - name: Fetch Artifacts
+              run: |
+                artifact_path="https://${{ vars.ARTIFACT_STORAGE_ACCOUNT }}.blob.core.windows.net/${{ vars.ARTIFACT_CONTAINER }}/${{ vars.ARTIFACT_FOLDER }}/${{ vars.ARTIFACT_NAME }}?${{ secrets.ARTIFACT_SAS_TOKEN }}"
+                mkdir -p .artifact_cache
+                curl -fsSL "${artifact_path}" -o ".artifact_cache/${{ vars.ARTIFACT_NAME }}"
+                unzip -q "${{ vars.ARTIFACT_NAME }}" -d .artifact_cache
+
+            - name: Build docker image
+              run: |
+                # Configure image version
+                model_name="${{ vars.MODEL_NAME }}"
+                model_version="${{ vars.MODEL_VERSION }}"
+                image="${model_name}_v${model_version}"
+
+                proj_version="${{ needs.info.outputs.project_version }}"
+                build_number=$(date +%Y%m%dT%H%M)
+                version="${proj_version}.dev${build_number}"
+
+                image_name="${image}:${version}"
+
+                project_root=$(git rev-parse --show-toplevel)
+                dockerfile_path="${project_root}/pipeline_app/Dockerfile"
+
+                # Build image
+                DOCKER_BUILDKIT=1 docker buildx build \
+                    --platform linux/amd64 \
+                    --build-arg "RELEASE_VERSION=$version" \
+                    --build-arg "APP_INSTALLER_FILE=${{ vars.APP_INSTALLER_FILE }}" \
+                    --build-arg "APP_FILE=${{ vars.APP_FILE }}" \
+                    --build-arg "APP_SETUP_ARGS=${{ vars.APP_SETUP_ARGS }}"  \
+                    --build-arg "APP_ALIAS=${{ vars.APP_ALIAS }}" \
+                    -t "$image_name" -f "${dockerfile_path}" "${project_root}"
+
+            - name: Login to Azure Container Registry
+              uses: docker/login-action@v3
+              with:
+                registry: ${{ vars.CONTAINER_REGISTRY_NAME }}.azurecr.io
+                username: ${{ vars.CONTAINER_REGISTRY_USERNAME }}
+                password: ${{ secrets.CONTAINER_REGISTRY_PASSWORD }}
+
+            - name: Push Image
+              run: |
+                # Tag image
+                docker tag "${image}:${version}" "${image}:latest"
+                docker tag "${image}:${version}" "${{ vars.CONTAINER_REGISTRY_NAME }}.azurecr.io/${{ vars.CONTAINER_REGISTRY_NAMESPACE }}/${image}:${version}"
+                docker tag "${image}:latest" "${{ vars.CONTAINER_REGISTRY_NAME }}.azurecr.io/${{ vars.CONTAINER_REGISTRY_NAMESPACE }}/${image}:latest"
+
+                docker push "${{ vars.CONTAINER_REGISTRY_NAME }}.azurecr.io/${{ vars.CONTAINER_REGISTRY_NAMESPACE }}/${image}:${version}"
+                docker push "${{ vars.CONTAINER_REGISTRY_NAME }}.azurecr.io/${{ vars.CONTAINER_REGISTRY_NAMESPACE }}/${image}:latest"
