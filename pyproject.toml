@@ -12,6 +12,9 @@ classifiers = [
 requires-python = ">=3.12.0"
 dependencies = []
 
+[tool.project_meta]
+short_name = "azcntnrapp"
+
 [tool.codespell]
 count = ''
 quiet-level = 3

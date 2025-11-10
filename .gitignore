@@ -17,8 +17,11 @@ local.settings.json
 # Environments
 .venv
 .env
+dev.env
 *.zip
 .artifact_cache
+
+.dist
 
 # Config files
 runtime-config.json

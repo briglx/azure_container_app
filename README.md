@@ -2,7 +2,6 @@
 
 Example project demonstraiting an automated workflow for file processing. Uploading a file triggers a containerized application that processes the file and writes results back to the storage account. 
 
-
 ![Architecture Overview](./docs/architecture_overview.drawio.png)
 
 # Getting Started
@@ -26,7 +25,7 @@ cp example.env .env
 [ -f .env ] && while IFS= read -r line; do [[ $line =~ ^[^#]*= ]] && eval "export $line"; done < .env
 
 # Login to az. Only required once per install.
-az login --tenant $AZURE_TENANT_ID --use-device-code
+az login --tenant "$AZURE_TENANT_ID" --use-device-code
 ```
 
 ## Provision Resources
@@ -36,37 +35,170 @@ Typical system requirements are:
 * 2 GB RAM is recommended
 * 10GB disk
 
-```bash
-# Shared Resources------------------------
-# Container Registry
-# Storage Account - Shared Artifacts
-# Solution Resources-----------------------
-# Azure Container Instance
-# Storage Account - Application Working Files
-# File Shares - Networked mapped working files
-az storage share create \
-    --account-name "$APP_STORAGE_ACCOUNT_NAME" \
-    --account-key "$APP_STORAGE_KEY" \
-    --name share
+Shared Resources
+- Container Registry
+- Storage Account - Shared Artifacts
+- Monitoring
+    ```bash
+    project_root=$(pwd) # Running in project root
+    project_name=$(cat "${project_root}/pyproject.toml" | grep -oP '(?<=^name = ")[^"]+' | tr -d '\n')
+    short_name=$(cat "${project_root}/pyproject.toml" | grep -oP '(?<=^short_name = ")[^"]+' | tr -d '\n')
+    project_version=$(cat "${project_root}/pyproject.toml" | grep -oP '(?<=^version = ")[^"]+' | tr -d '\n')
+    resource_token=$(echo -n "${SUBSCRIPTION_ID}${project_name}${LOCATION}" | sha1sum | awk '{print $1}' | cut -c1-8)
+    short_env=$(echo "${ENVIRONMENT:0:1}" | tr '[:upper:]' '[:lower:]')
+    tags="asn=tbd project=$project_name owner=tbd environment=$ENVIRONMENT"
 
-# Function App
-az functionapp config appsettings set \
-    --name "$FUNC_APP_NAME" \
-    --resource-group "$FUNC_APP_RG" \
-    --settings "APP_STORAGE_CONNECTION=$APP_STORAGE_CONNECTION" \
-        "APP_STORAGE_CONTAINER=$APP_STORAGE_CONTAINER" \
-        "APP_STORAGE_INPUT_PATH=$APP_STORAGE_INPUT_PATH" \
-        "APP_STORAGE_OUTPUT_PATH=$APP_STORAGE_OUTPUT_PATH"
+    rg_common_name="rg-common-${ENVIRONMENT}-${LOCATION}"
+
+    log_analytics_name="log-common-${ENVIRONMENT}-${LOCATION}-${resource_token}"
         
+    results=$(az monitor log-analytics workspace create \
+        --resource-group "$rg_common_name" \
+        --workspace-name "$log_analytics_name" \
+        --location "$LOCATION" \
+        --sku PerGB2018)
+    LOG_ANALYTICS_ID=$(echo "$results" | jq -r '.id')
+    ```
+
+Solution Resources
+- Resource Group
+    ```bash
+    project_root=$(pwd) # Running in project root
+    project_name=$(cat "${project_root}/pyproject.toml" | grep -oP '(?<=^name = ")[^"]+' | tr -d '\n')
+    short_name=$(cat "${project_root}/pyproject.toml" | grep -oP '(?<=^short_name = ")[^"]+' | tr -d '\n')
+    tags="asn=tbd project=$project_name owner=tbd environment=$ENVIRONMENT"
+
+    base_name="${short_name}-${ENVIRONMENT}-${LOCATION}"
+    rg_name="rg-${base_name//_/-}"
+
+    az group create \
+        --name "$rg_name" \
+        --location "$LOCATION"
+    ```
+- Azure Container Instance
+- Primary Storage Account - Application Working Files
+    ```bash
+    # vars
+    project_root=$(pwd) # Running in project root
+    project_name=$(cat "${project_root}/pyproject.toml" | grep -oP '(?<=^name = ")[^"]+' | tr -d '\n')
+    short_name=$(cat "${project_root}/pyproject.toml" | grep -oP '(?<=^short_name = ")[^"]+' | tr -d '\n')
+    short_env=$(echo "${ENVIRONMENT:0:1}" | tr '[:upper:]' '[:lower:]')
+    tags="asn=tbd project=$project_name owner=tbd environment=$ENVIRONMENT servicetier=tier3"
+
+    base_name="${short_name}-${ENVIRONMENT}-${LOCATION}"
+    rg_name="rg-${base_name//_/-}"
+
+    app_storage_account_name="st${short_name}primary${short_env}"
+    app_storage_account_name=$(echo "$app_storage_account_name" | tr '[:upper:]' '[:lower:]')
+    app_storage_account_name="${app_storage_account_name//[^a-z0-9]/}"
+    app_storage_account_name="${app_storage_account_name:0:24}"
+
+    # Resource Group
+    az group create \
+        --name "$rg_name" \
+        --location "$LOCATION"
+
+    # App storage account
+    results=$(az storage account create \
+        --name "$app_storage_account_name" \
+        --location "$LOCATION" \
+        --resource-group "$rg_name" \
+        --sku Standard_LRS \
+        --allow-blob-public-access true \
+        --tags "$tags")
+    APP_STORAGE_ACCOUNT_NAME=$(echo "$results" | jq -r '.name')
+    APP_STORAGE_CONNECTION=$(az storage account show-connection-string \
+        --name "$app_storage_account_name" \
+        --resource-group "$rg_name" \
+        -o tsv
+    )
+
+    # Create container
+    az storage container create \
+        --name "$APP_STORAGE_CONTAINER" \
+        --account-name "$APP_STORAGE_ACCOUNT_NAME" \
+        --account-key "$APP_STORAGE_KEY"
+    
+    # Create default directories
+    touch emptyfile
+    az storage blob upload \
+        --container-name "$APP_STORAGE_CONTAINER" \
+        --file emptyfile \
+        --name "${APP_STORAGE_INPUT_PATH}/emptyfile" \
+        --account-name "$APP_STORAGE_ACCOUNT_NAME" \
+        --account-key "$APP_STORAGE_KEY"
+    
+    az storage blob upload \
+        --container-name "$APP_STORAGE_CONTAINER" \
+        --file emptyfile \
+        --name "${APP_STORAGE_OUTPUT_PATH}/emptyfile" \
+        --account-name "$APP_STORAGE_ACCOUNT_NAME" \
+        --account-key "$APP_STORAGE_KEY"
+    rm emptyfile
+
+    ```
+- File Shares - Networked mapped working files
+    ```bash
+    az storage share create \
+        --account-name "$APP_STORAGE_ACCOUNT_NAME" \
+        --account-key "$APP_STORAGE_KEY" \
+        --name share
+    ```
+- Function app - [func_app](./func_app/README.md)
+- Event Grid
+```bash    
+project_root=$(pwd) # Running in project root
+project_name=$(cat "${project_root}/pyproject.toml" | grep -oP '(?<=^name = ")[^"]+' | tr -d '\n')
+short_name=$(cat "${project_root}/pyproject.toml" | grep -oP '(?<=^short_name = ")[^"]+' | tr -d '\n')
+project_version=$(cat "${project_root}/pyproject.toml" | grep -oP '(?<=^version = ")[^"]+' | tr -d '\n')
+resource_token=$(echo -n "${SUBSCRIPTION_ID}${project_name}${LOCATION}" | sha1sum | awk '{print $1}' | cut -c1-8)
+short_env=$(echo "${ENVIRONMENT:0:1}" | tr '[:upper:]' '[:lower:]')
+tags="asn=tbd project=$project_name owner=tbd environment=$ENVIRONMENT servicetier=tier3"
+
+base_name="${short_name}-${ENVIRONMENT}-${LOCATION}"
+rg_name="rg-${base_name//_/-}"
+
+eventgrid_system_topic_name="evgst-${short_name}-pri-strg-${short_env}"
+eventgrid_system_topic_name=$(echo "$eventgrid_system_topic_name" | tr '[:upper:]' '[:lower:]')
+eventgrid_system_topic_name="${eventgrid_system_topic_name//[^a-z0-9]/}"
+eventgrid_system_topic_name="${eventgrid_system_topic_name:0:24}"  
+
+eventgrid_event_subscription_name="evgs-${short_name}-blob2func-${short_env}"
+eventgrid_event_subscription_name=$(echo "$eventgrid_event_subscription_name" | tr '[:upper:]' '[:lower:]')
+eventgrid_event_subscription_name="${eventgrid_event_subscription_name//[^a-z0-9]/}"
+eventgrid_event_subscription_name="${eventgrid_event_subscription_name:0:24}" 
+
 # Event Grid
 az provider register --namespace Microsoft.EventGrid
 az provider show --namespace Microsoft.EventGrid --query "registrationState"
 
 app_storageid=$(az storage account show --name "$APP_STORAGE_ACCOUNT_NAME" --resource-group "$APP_STORAGE_RG" --query id --output tsv)
-az eventgrid event-subscription create \
-    --source-resource-id "$app_storageid" \
-    --name "$EVENT_SUBSCRIPTION_NAME" \
-    --endpoint "$FUNC_APP_ENDPOINT"
+az eventgrid system-topic create \
+    --name "$eventgrid_system_topic_name" \
+    --resource-group "$rg_name" \
+    --source "$app_storageid" \
+    --topic-type Microsoft.Storage.StorageAccounts \
+    --location "$LOCATION"
+
+# It is expected that the destination endpoint to be already created and available for use before executing any Event Grid command.
+az eventgrid system-topic event-subscription create \
+    --name "$eventgrid_event_subscription_name" \
+    --resource-group "$rg_name" \
+    --system-topic-name "$eventgrid_system_topic_name" \
+    --endpoint "https://${FUNC_APP_NAME}.azurewebsites.net/runtime/webhooks/blobs?functionName=Host.Functions.${FUNC_NAME}&code=${FUNC_BLOB_EXT_KEY}" \
+    --endpoint-type webhook \
+    --included-event-types Microsoft.Storage.BlobCreated
+
+# Test
+timestamp=$(date +'%Y%m%d%H%M%S')
+test_file="test_$timestamp"
+touch "$test_file"
+az storage blob upload \
+    --container-name "$APP_STORAGE_CONTAINER" \
+    --file "$test_file" \
+    --name "${APP_STORAGE_INPUT_PATH}/${test_file}" \
+    --account-name "$APP_STORAGE_ACCOUNT_NAME" \
+    --account-key "$APP_STORAGE_KEY"
 ```
 
 This approach uses a centralized artifact store for binaries. Blob storage account is the artifact store
@@ -374,4 +506,36 @@ az keyvault secret set \
 
 # Get ACR password
 CONTAINER_REGISTRY_PASSWORD=$(az keyvault secret show --vault-name "$KEY_VAULT_NAME" --name "$acr_password_name" --query value -o tsv)
+```
+
+## Event Grid
+
+```bash
+# Threw error connecting to endpoint
+az eventgrid system-topic event-subscription create \
+    --name "${eventgrid_event_subscription_name}-b" \
+    --resource-group "$rg_name" \
+    --system-topic-name "$eventgrid_system_topic_name" \
+    --endpoint "https://${FUNC_APP_NAME}.azurewebsites.net/runtime/webhooks/blobs" \
+    --endpoint-type webhook \
+    --included-event-types Microsoft.Storage.BlobCreated
+    # --subject-begins-with "/blobServices/default/containers/$APP_STORAGE_CONTAINER"
+
+#  Didn't work with Blob trigger. Did work with event_grid_trigger
+az eventgrid system-topic event-subscription create \
+    --name "$eventgrid_event_subscription_name" \
+    --resource-group "$rg_name" \
+    --system-topic-name "$eventgrid_system_topic_name" \
+    --endpoint "/subscriptions/${SUBSCRIPTION_ID}/resourceGroups/${FUNC_APP_RG}/providers/Microsoft.Web/sites/${FUNC_APP_NAME}/functions/${FUNC_NAME}" \
+    --endpoint-type azurefunction \
+    --included-event-types Microsoft.Storage.BlobCreated \
+    --subject-begins-with "/blobServices/default/containers/${APP_STORAGE_CONTAINER}/blobs/${APP_STORAGE_INPUT_PATH}"
+
+# All in one
+# az eventgrid event-subscription create \
+#    --name "$eventgrid_event_subscription_name" \
+#    --resource-group "$rg_name" \
+#    --system-topic-name "$eventgrid_s
+#    --source-resource-id "$app_storageid" \
+#    --endpoint "$FUNC_APP_ENDPOINT" -->
 ```
