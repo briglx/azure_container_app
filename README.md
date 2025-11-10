@@ -1,6 +1,6 @@
 # File Processing Pipeline
 
-Example project demonstraiting an automated workflow for file processing. Uploading a file triggers a containerized application that processes the file and writes results back to the storage account. 
+Example project demonstrating an automated workflow for file processing. Uploading a file triggers a containerized application that processes the file and writes results back to the storage account. 
 
 ![Architecture Overview](./docs/architecture_overview.drawio.png)
 

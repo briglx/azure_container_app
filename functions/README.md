@@ -1,6 +1,6 @@
 # File Processing Pipeline - Function App
 
-The fuction app receives the trigger to spin up a container instance.
+The function app receives the trigger to spin up a container instance.
 
 ## Provision Resources
 
@@ -11,7 +11,7 @@ Prerequisites
 Resources
 * Application Storage Account
 * Function App Storage Account
-* Applicatin Insights
+* Application Insights
 * Function App
 * Function App Config Settings
 
@@ -83,7 +83,7 @@ az functionapp create \
     --https-only true \
     --tags "$tags"
 
-# Confgiure App Settings
+# Configure App Settings
 az functionapp config appsettings set \
     --name "$funcapp_name" \
     --resource-group "$rg_name" \
