@@ -117,7 +117,8 @@ az functionapp deployment source config-zip \
     --src "$zip_file_path" \
     --name "$funcapp_name" \
     --resource-group "$rg_name" \
-    --build-remote true
+    --build-remote true \
+    --timeout 120
 ```
 
 ## References

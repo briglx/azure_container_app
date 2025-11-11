@@ -10,7 +10,7 @@ on:
                 type: boolean
 
 jobs:
-    build_and_push:
+    build_and_push_docker_image:
         runs-on: ubuntu-latest
         environment: dev
         steps:

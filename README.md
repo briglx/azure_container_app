@@ -36,29 +36,15 @@ Typical system requirements are:
 * 10GB disk
 
 Shared Resources
-- Container Registry
-- Storage Account - Shared Artifacts
-- Monitoring
-    ```bash
-    project_root=$(pwd) # Running in project root
-    project_name=$(cat "${project_root}/pyproject.toml" | grep -oP '(?<=^name = ")[^"]+' | tr -d '\n')
-    short_name=$(cat "${project_root}/pyproject.toml" | grep -oP '(?<=^short_name = ")[^"]+' | tr -d '\n')
-    project_version=$(cat "${project_root}/pyproject.toml" | grep -oP '(?<=^version = ")[^"]+' | tr -d '\n')
-    resource_token=$(echo -n "${SUBSCRIPTION_ID}${project_name}${LOCATION}" | sha1sum | awk '{print $1}' | cut -c1-8)
-    short_env=$(echo "${ENVIRONMENT:0:1}" | tr '[:upper:]' '[:lower:]')
-    tags="asn=tbd project=$project_name owner=tbd environment=$ENVIRONMENT"
+* Resource Group
+* Storage Account - Shared Artifacts
+* Container Registry
+* Log Analytics Workspace
 
-    rg_common_name="rg-common-${ENVIRONMENT}-${LOCATION}"
-
-    log_analytics_name="log-common-${ENVIRONMENT}-${LOCATION}-${resource_token}"
-        
-    results=$(az monitor log-analytics workspace create \
-        --resource-group "$rg_common_name" \
-        --workspace-name "$log_analytics_name" \
-        --location "$LOCATION" \
-        --sku PerGB2018)
-    LOG_ANALYTICS_ID=$(echo "$results" | jq -r '.id')
-    ```
+```bash
+# Provision Shared Resources
+./script/devops_provision_shared.sh
+```
 
 Solution Resources
 - Resource Group
@@ -209,8 +195,9 @@ curl /path/to/files -o "$ARTIFACT_NAME"
 az storage blob upload \
     --account-name "$ARTIFACT_STORAGE_ACCOUNT" \
     --container-name "$ARTIFACT_CONTAINER" \
-    --name "$ARTIFACT_NAME" \
     --file "$ARTIFACT_NAME"
+    --name "$ARTIFACT_NAME" \
+    --account-key "$ARTIFACT_STORAGE_ACCOUNT_KEY"
 ```
 
 ## Build and Deploy the Artifact
@@ -413,7 +400,7 @@ Summary of the most relevant points:
 ```bash
 # Run linters outside of pre-commit
 codespell
-shellcheck -x *.sh
+shellcheck -x ./script/*.sh
 ```
 
 # Notes
