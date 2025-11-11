@@ -33,13 +33,9 @@ jobs:
         github.event.inputs.provisionShared == 'true'
       )
     steps:
-      # - uses: actions/checkout@v4.1.1
-      # - name: OIDC Login to Azure
-      #   uses: azure/login@v2
-      #   with:
-      #     client-id: ${{ secrets.CICD_CLIENT_ID }}
-      #     tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-      #     subscription-id: ${{ secrets.SUBSCRIPTION_ID }}
+      - name: Check out code from GitHub
+        uses: actions/checkout@v5
+
       - name: Create Resources
         id: task-create-resources
         run: |

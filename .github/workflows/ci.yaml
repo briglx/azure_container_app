@@ -15,7 +15,7 @@ jobs:
         environment: dev
         steps:
             - name: Check out code from GitHub
-              uses: actions/checkout@v4.1.1
+              uses: actions/checkout@v5
 
             - name: Set common variables
               id: set-env
