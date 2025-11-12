@@ -258,7 +258,7 @@ if [[ $response == '[]' ]]; then
     echo "Adding OIDC federated identity credentials to the app registration..." >&2
     post_body="{\"name\":\"$app_secret_name\","
     post_body=$post_body'"issuer":"https://token.actions.githubusercontent.com",'
-    post_body=$post_body"\"subject\":\"repo:$GITHUB_ORG/$GITHUB_REPO:ref:refs/heads/main\","
+    post_body=$post_body"\"subject\":\"repo:$GITHUB_ORG/$GITHUB_REPO:environment:staging\","
     post_body=$post_body'"description":"GitHub CICID Service","audiences":["api://AzureADTokenExchange"]}'
     az rest --method POST --uri "https://graph.microsoft.com/beta/applications/$app_id/federatedIdentityCredentials" --body "$post_body"
 
@@ -269,21 +269,11 @@ else
 fi
 
 # Save generated values to .env file
-if [ -z "$CICD_CLIENT_NAME" ]; then
-    echo "Save CICD_CLIENT_NAME to ${env_file}" >&2
-    {
-        echo ""
-        echo "# create_cicd_sp.sh generated values"
-        echo "# Generated on ${isa_date_utc}"
-        echo "CICD_CLIENT_NAME=$app_name"
-    }>> "$env_file"
-fi
-if [ -z "$CICD_CLIENT_ID" ]; then
-    echo "Save CICD_CLIENT_ID to ${env_file}" >&2
-    {
-        echo ""
-        echo "# create_cicd_sp.sh generated values"
-        echo "# Generated on ${isa_date_utc}"
-        echo "CICD_CLIENT_ID=$app_client_id"
-    }>> "$env_file"
-fi
+echo "Save CICD_CLIENT_NAME to ${env_file}" >&2
+{
+    echo ""
+    echo "# create_cicd_sp.sh generated values"
+    echo "# Generated on ${isa_date_utc}"
+    echo "CICD_CLIENT_NAME=$app_name"
+    echo "CICD_CLIENT_ID=$app_client_id"
+}>> "$env_file"
