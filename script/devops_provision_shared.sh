@@ -11,6 +11,8 @@
 #   CONTAINER_REGISTRY_NAME
 #   CONTAINER_REGISTRY_USERNAME
 #   LOG_ANALYTICS_ID
+# Params
+#    -d, Debug mode
 #########################################################################
 
 # Stop on errors

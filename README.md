@@ -12,10 +12,9 @@ Configure the environment variables. Copy `example.env` to `.env` and update the
 
 The solution use system identities to deploy cloud resources. The following table lists the system identities and their purpose.
 
-| System Identities      | Authentication                                             | Authorization                                                                                                                                                                  | Purpose                                                                                                          |
-| ---------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------- |
-| TBD| TBD | TBD| TBD |
-
+| System Identities                 | Authentication                                             | Authorization                                                                                                                                                                  | Purpose                                                                            |
+| --------------------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------- |
+| `env.AZURE_CICD_CLIENT_NAME`      | OpenId Connect (OIDC) based Federated Identity Credentials | <ul><li>Subscription Contributor OR Owner OR</li><li>Storage Account Contributor, Storage Account Key Operator Service Role, Storage Blob Data Contributor, AcrPush, Monitoring Contributor OR</li><li>Custom Role</li><li><ul><li>`Microsoft.Resources/subscriptions/resourceGroups/write`</li><li>`Microsoft.Storage/storageAccounts/write`</li><li>`Microsoft.Storage/storageAccounts/listKeys/action`</li><li>`Microsoft.Storage/storageAccounts/blobServices/containers/write`</li><li>`Microsoft.ContainerRegistry/registries/write`</li><li>`Microsoft.ContainerRegistry/registries/tokens/write`</li><li>`Microsoft.OperationalInsights/workspaces/write`</li></ul>  | Deploy Shared resources: <ul><li>Resource Group</li><li>Storage Account</li><li>Container Registry</li><li>Log Analytics Workspace</li></ul></li></ul> |
 ```bash
 # Configure the environment variables. Copy `example.env` to `.env` and update the values
 cp example.env .env
@@ -26,6 +25,9 @@ cp example.env .env
 
 # Login to az. Only required once per install.
 az login --tenant "$AZURE_TENANT_ID" --use-device-code
+
+# Create CICD System Identity
+./script/create_cicd_sp.sh
 ```
 
 ## Provision Resources
