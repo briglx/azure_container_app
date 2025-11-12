@@ -1,0 +1,12 @@
+{
+    "Name": "Custom - Resource Group Creator",
+    "IsCustom": true,
+    "Description": "Can create and manage resource groups, but nothing inside them.",
+    "Actions": [
+      "Microsoft.Resources/subscriptions/resourceGroups/read",
+      "Microsoft.Resources/subscriptions/resourceGroups/write"
+    ],
+    "NotActions": [],
+    "AssignableScopes": ["{{ASSIGNABLE_SCOPE}}"]
+  }
+  

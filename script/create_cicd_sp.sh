@@ -36,6 +36,57 @@ validate_provision_parameters(){
     fi
 }
 
+assign_role(){
+
+    local role_name=$1
+    local role_definition=$2
+    local scope=$3
+    local app_sp_id=$4
+    local role_id
+    
+    # Get Custom role ID
+    role_id=$(az role definition list \
+        --name "$role_name" \
+        --query '[0].id' -o tsv 2>/dev/null || echo "")
+
+    # Create Custom - Resource Group Creator role if it does not exist
+    if [ -n "$role_id" ]; then
+        echo "Role $role_name already exists." >&2
+    else
+        echo "Creating role $role_name with definition:\n$role_definition" >&2
+
+        set +e
+        results=$(az role definition create \
+            --role-definition "$role_definition" \
+            --only-show-errors 2>&1)
+        set -e
+        if [ "$debug" -eq 1 ]; then
+            echo "$results" >> "${project_root}/.deploy_log/az_role_definition_create_$role_name.json"
+        fi
+
+        role_id=$(echo "$results" | jq -r '.id')
+
+    fi
+
+    set +e
+    results=$(az role assignment create \
+        --role "$role_id" \
+        --scope "$scope" \
+        --assignee-object-id  "$app_sp_id" \
+        --assignee-principal-type ServicePrincipal \
+        --only-show-errors 2>&1)
+    set -e
+    if [ "$debug" -eq 1 ]; then
+        echo "$results" >> "${project_root}/.deploy_log/az_role_assignment_create_$role_name.json"
+    fi
+
+    assignment_id=$(echo "$results" | jq -r '.id' || echo "")
+
+    echo "Successfully assigned role $role_name to service principal." >&2
+    echo "$assignment_id"
+
+}
+
 # Parameters
 while getopts "d" opt; do
   case $opt in
@@ -100,7 +151,7 @@ if [ -z "$CICD_CLIENT_ID" ]; then
 
     app_id=$(echo "$results" | jq -r '.id')
     app_client_id=$(echo "$results" | jq -r '.appId')
-    echo "App registration created with App ID: $app_id and Client ID: $app_client_id" >&2
+    echo "App registration created" >&2
 
     echo "Creating service principal for the app registration..." >&2
     set +e
@@ -115,7 +166,7 @@ if [ -z "$CICD_CLIENT_ID" ]; then
     # Need app service principal to Assign roles
     echo "Get the service principal ID..." >&2
     app_sp_id=$(echo "$results" | jq -r '.id')
-    echo "Service principal created with ID: $app_sp_id" >&2
+    echo "Service principal created" >&2
 
 else
     echo "Using existing CICD_CLIENT_ID" >&2
@@ -129,14 +180,14 @@ else
         echo "$results" >> "${project_root}/.deploy_log/az_ad_list.json"
     fi
 
-    app_name=$(echo "$results" | jq -r '.name')
-    app_id=$(echo "$results" | jq -r '.id')
+    app_name=$(echo "$results" | jq -r '.[0].displayName')
+    app_id=$(echo "$results" | jq -r '.[0].id')
     app_client_id=$(echo "$results" | jq -r '.[0].appId')
 
-    echo "Found app registration $app_name. App ID: $app_id and Client ID: $app_client_id" >&2
+    echo "Found app registration $app_name." >&2
 
     # get the service principal ID
-    echo "Get the service principal ID..." >&2
+    echo "Get service principal ID..." >&2
     set +e
     results=$(az ad sp list \
         --all \
@@ -146,41 +197,93 @@ else
     if [ "$debug" -eq 1 ]; then
         echo "$results" >> "${project_root}/.deploy_log/az_ad_sp_list.json"
     fi
-    app_sp_id=$(echo "$results" | jq -r '.id')
-    echo "Service principal ID: $app_sp_id" >&2
+    app_sp_id=$(echo "$results" | jq -r '.[0].id')
+    echo "Found service principal." >&2
 fi
 
-# echo "Assigning roles to the service principal..." >&2
-# az role assignment create --assignee "$app_sp_id" --role contributor --scope "/subscriptions/$SUBSCRIPTION_ID"
-# az role assignment create --role contributor --subscription "$SUBSCRIPTION_ID" --assignee-object-id  "$app_sp_id" --assignee-principal-type ServicePrincipal --scope "/subscriptions/$SUBSCRIPTION_ID"
-
-# # Add OIDC federated credentials for the application.
-# echo "Adding OIDC federated identity credentials to the app registration..." >&2
-# post_body="{\"name\":\"$app_secret_name\","
-# post_body=$post_body'"issuer":"https://token.actions.githubusercontent.com",'
-# post_body=$post_body"\"subject\":\"repo:$GITHUB_ORG/$GITHUB_REPO:pull_request\","
-# post_body=$post_body'"description":"GitHub CICID Service","audiences":["api://AzureADTokenExchange"]}'
-# az rest --method POST --uri "https://graph.microsoft.com/beta/applications/$app_id/federatedIdentityCredentials" --body "$post_body"
-
-# echo "CICD service principal created successfully." >&2
 
 
-# # Save generated values to .env file
-# if [ -z "$CICD_CLIENT_NAME" ]; then
-#     echo "Save CICD_CLIENT_NAME to ${env_file}" >&2
-#     {
-#         echo ""
-#         echo "# create_cicd_sp.sh generated values"
-#         echo "# Generated on ${isa_date_utc}"
-#         echo "CICD_CLIENT_NAME=$app_name"
-#     }>> "$env_file"
-# fi
-# if [ -z "$CICD_CLIENT_ID" ]; then
-#     echo "Save CICD_CLIENT_ID to ${env_file}" >&2
-#     {
-#         echo ""
-#         echo "# create_cicd_sp.sh generated values"
-#         echo "# Generated on ${isa_date_utc}"
-#         echo "CICD_CLIENT_ID=$app_client_id"
-#     }>> "$env_file"
-# fi
+echo "Assigning roles to the service principal..." >&2
+
+# Customer Role - Resource Group Creator
+role_name=$(cat "${project_root}/docs/ad_resource_group_creator_role.json" | jq -r '.Name')
+response=$(az role assignment list --assignee "$app_sp_id" --role "$role_name")
+if [[ $response == '[]' ]]; then
+    role_definition=$("$project_root"/script/render_role_template.sh -i "${project_root}/docs/ad_resource_group_creator_role.json" -v ASSIGNABLE_SCOPE="/subscriptions/$SUBSCRIPTION_ID")
+    response=$(assign_role "$role_name" "$role_definition" "/subscriptions/$SUBSCRIPTION_ID" "$app_sp_id")
+    if [[ ${PIPESTATUS[0]} -ne 0 ]]; then
+        echo "Failed to assign $role_name role to service principal" >&2
+        exit 1
+    fi
+    echo "Assigned $role_name role." >&2
+else
+    echo "Service principal already has $role_name role." >&2
+fi
+
+# Built in roles
+roles=(
+  "Storage Account Contributor"
+  "Storage Account Key Operator Service Role"
+  "Storage Blob Data Contributor"
+  "AcrPush"
+  "Monitoring Contributor"
+)
+
+for role_name in "${roles[@]}"; do
+    # Check if role already assigned
+    response=$(az role assignment list --assignee "$app_sp_id" --role "$role_name")
+    if [[ $response == '[]' ]]; then
+        # Assign role
+        echo "Assigning $role_name role to service principal..." >&2
+        response=$(az role assignment create --role "$role_name" --scope "/subscriptions/$SUBSCRIPTION_ID" --assignee-object-id "$app_sp_id" --assignee-principal-type ServicePrincipal --subscription "$SUBSCRIPTION_ID" )
+        if [[ ${PIPESTATUS[0]} -ne 0 ]]; then
+            echo "Failed to assign $role_name role to service principal" >&2
+            if [ "$debug" -eq 1 ]; then
+                echo "$response" >> "${project_root}/.deploy_log/az_role_assignment_create_${role_name}.json"
+            fi
+            exit 1
+        fi
+        echo "Assigned $role_name role." >&2
+    else
+        echo "Service principal already has $role_name role." >&2
+    fi
+done
+
+
+# Add OIDC federated credentials for the application.
+response=$(az ad app federated-credential list --id "$app_id")
+if [[ $response == '[]' ]]; then
+    echo "No existing federated identity credentials found." >&2
+        
+    echo "Adding OIDC federated identity credentials to the app registration..." >&2
+    post_body="{\"name\":\"$app_secret_name\","
+    post_body=$post_body'"issuer":"https://token.actions.githubusercontent.com",'
+    post_body=$post_body"\"subject\":\"repo:$GITHUB_ORG/$GITHUB_REPO:ref:refs/heads/main\","
+    post_body=$post_body'"description":"GitHub CICID Service","audiences":["api://AzureADTokenExchange"]}'
+    az rest --method POST --uri "https://graph.microsoft.com/beta/applications/$app_id/federatedIdentityCredentials" --body "$post_body"
+
+    echo "OIDC federated identity credentials added." >&2
+
+else
+    echo "Existing federated identity credentials found. Skipping addition." >&2
+fi
+
+# Save generated values to .env file
+if [ -z "$CICD_CLIENT_NAME" ]; then
+    echo "Save CICD_CLIENT_NAME to ${env_file}" >&2
+    {
+        echo ""
+        echo "# create_cicd_sp.sh generated values"
+        echo "# Generated on ${isa_date_utc}"
+        echo "CICD_CLIENT_NAME=$app_name"
+    }>> "$env_file"
+fi
+if [ -z "$CICD_CLIENT_ID" ]; then
+    echo "Save CICD_CLIENT_ID to ${env_file}" >&2
+    {
+        echo ""
+        echo "# create_cicd_sp.sh generated values"
+        echo "# Generated on ${isa_date_utc}"
+        echo "CICD_CLIENT_ID=$app_client_id"
+    }>> "$env_file"
+fi

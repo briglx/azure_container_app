@@ -15,6 +15,18 @@ The solution use system identities to deploy cloud resources. The following tabl
 | System Identities                 | Authentication                                             | Authorization                                                                                                                                                                  | Purpose                                                                            |
 | --------------------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------- |
 | `env.AZURE_CICD_CLIENT_NAME`      | OpenId Connect (OIDC) based Federated Identity Credentials | <ul><li>Subscription Contributor OR Owner OR</li><li>Storage Account Contributor, Storage Account Key Operator Service Role, Storage Blob Data Contributor, AcrPush, Monitoring Contributor OR</li><li>Custom Role</li><li><ul><li>`Microsoft.Resources/subscriptions/resourceGroups/write`</li><li>`Microsoft.Storage/storageAccounts/write`</li><li>`Microsoft.Storage/storageAccounts/listKeys/action`</li><li>`Microsoft.Storage/storageAccounts/blobServices/containers/write`</li><li>`Microsoft.ContainerRegistry/registries/write`</li><li>`Microsoft.ContainerRegistry/registries/tokens/write`</li><li>`Microsoft.OperationalInsights/workspaces/write`</li></ul>  | Deploy Shared resources: <ul><li>Resource Group</li><li>Storage Account</li><li>Container Registry</li><li>Log Analytics Workspace</li></ul></li></ul> |
+
+Role Detail for `env.AZURE_CICD_CLIENT_NAME` 
+
+| Permission Scope | Purpose | Built in Role | Least Privlage |
+| --- | --- | --- | --- |
+| `/subscription/sub-common/` | Provision Shared Resources - Resource Group | `Subscription Contributor` | <ul><li>`Microsoft.Resources/subscriptions/resourceGroups/write`</li></ul> |
+| `/subscription/sub-common/resource_group/rg-common/` | Provision Shared Artifact Store - Storage Account | `Storage Account Contributor` | <ul><li>`Microsoft.Storage/storageAccounts/read`</li><li>`Microsoft.Storage/storageAccounts/write`</li></ul> |
+| `/subscription/sub-common/resource_group/rg-common/storage/startifacts` | Provision Artifact Container - Storage Account Container | `Storage Blob Data Contributor` | <ul><li>`Microsoft.Storage/storageAccounts/blobServices/containers/read`</li><li>`Microsoft.Storage/storageAccounts/blobServices/containers/write`</li></ul> |
+| `/subscription/sub-common/resource_group/rg-common/` | Provision Shared Container Registry | `Owner` or `Contributor` | <ul><li>`Microsoft.ContainerRegistry/registries/read`</li><li>`Microsoft.ContainerRegistry/registries/write`</li></ul> |
+| `/subscription/sub-common/resource_group/rg-common/crcommon` | Create ACR Credential to Push or pull artifacts | `AcrPush` | <ul><li>`Microsoft.ContainerRegistry/registries/pull/read`</li><li>`Microsoft.ContainerRegistry/registries/pull/write`</li></ul> |
+| `/subscription/sub-common/resource_group/rg-common/` | Provision Shared Monitoring | `Log Analytics Contributor` | <ul><li>`Microsoft.OperationalInsights/workspaces/read`</li><li>`Microsoft.OperationalInsights/workspaces/write`</li></ul> |
+
 ```bash
 # Configure the environment variables. Copy `example.env` to `.env` and update the values
 cp example.env .env
@@ -528,3 +540,7 @@ az eventgrid system-topic event-subscription create \
 #    --source-resource-id "$app_storageid" \
 #    --endpoint "$FUNC_APP_ENDPOINT" -->
 ```
+
+# References
+* Built in Azure Roles https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles
+* Azure Permissions https://learn.microsoft.com/en-us/azure/role-based-access-control/resource-provider-operations
