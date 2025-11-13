@@ -205,7 +205,7 @@ fi
 
 echo "Assigning roles to the service principal..." >&2
 
-# Customer Role - Resource Group Creator
+# Custome Role - Resource Group Creator
 role_name=$(cat "${project_root}/docs/ad_resource_group_creator_role.json" | jq -r '.Name')
 response=$(az role assignment list --assignee "$app_sp_id" --role "$role_name")
 if [[ $response == '[]' ]]; then
@@ -227,6 +227,8 @@ roles=(
   "Storage Blob Data Contributor"
   "AcrPush"
   "Monitoring Contributor"
+  "Key Vault Contributor"
+  "Key Vault Secrets Officer"
 )
 
 for role_name in "${roles[@]}"; do
@@ -235,7 +237,17 @@ for role_name in "${roles[@]}"; do
     if [[ $response == '[]' ]]; then
         # Assign role
         echo "Assigning $role_name role to service principal..." >&2
-        response=$(az role assignment create --role "$role_name" --scope "/subscriptions/$SUBSCRIPTION_ID" --assignee-object-id "$app_sp_id" --assignee-principal-type ServicePrincipal --subscription "$SUBSCRIPTION_ID" )
+
+        set +e
+        response=$(az role assignment create \
+            --role "$role_name" \
+            --scope "/subscriptions/$SUBSCRIPTION_ID" \
+            --assignee-object-id "$app_sp_id" \
+            --assignee-principal-type ServicePrincipal \
+            --subscription "$SUBSCRIPTION_ID" \
+            --only-show-errors 2>&1)
+        set -e
+
         if [[ ${PIPESTATUS[0]} -ne 0 ]]; then
             echo "Failed to assign $role_name role to service principal" >&2
             if [ "$debug" -eq 1 ]; then

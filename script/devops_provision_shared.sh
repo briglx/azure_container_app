@@ -301,6 +301,104 @@ provision_monitoring(){
     fi
 }
 
+provision_key_vault(){
+    echo "Provisioning Key Vault for shared resources" >&2
+    # Placeholder for Key Vault provisioning logic
+
+
+    if [ -z "$KEY_VAULT_NAME" ]; then
+
+        # Check if the key_vault_name already exists
+        kv_exists=$(az keyvault list --query "[?name=='$key_vault_name'] | length(@)" --output tsv)
+        if [ "$kv_exists" -gt 0 ]; then
+            echo "$key_vault_name already exists" >&2
+        else
+            echo "KEY_VAULT_NAME is not set. Creating a new one $key_vault_name" >&2
+            set +e
+            results=$(az keyvault create \
+                --name "$key_vault_name" \
+                --resource-group "$rg_common_name" \
+                --location "$LOCATION" \
+                --tags "$tags" \
+                --only-show-errors 2>&1)
+            set -e
+
+            if [ "$debug" -eq 1 ]; then
+                echo "$results" >> "${project_root}/.deploy_log/az_keyvault_create.json"
+            fi
+
+            # Check for errors in the results
+            if grep -q "ERROR" <<< "$results"; then
+                echo "Deployment failed due to an error."
+                echo "$results"
+                exit 1
+            fi
+        fi
+    else
+        echo "KEY_VAULT_NAME already exists" >&2
+        key_vault_name="$KEY_VAULT_NAME"
+    fi
+}
+
+# Save output variables to keyvault
+save_outputs_to_keyvault(){
+    echo "Saving output variables to Key Vault ${key_vault_name}" >&2
+
+    declare -A secrets=(
+        ["SharedArtifactStorageAccount"]="$ARTIFACT_STORAGE_ACCOUNT"
+        ["SharedArtifactStorageAccountKey"]="$ARTIFACT_STORAGE_ACCOUNT_KEY"
+        ["SharedArtifactContainer"]="$ARTIFACT_CONTAINER"
+        ["SharedContainerRegistryName"]="$CONTAINER_REGISTRY_NAME"
+        ["SharedContainerRegistryUsername"]="$CONTAINER_REGISTRY_USERNAME"
+        ["SharedContainerRegistryPassword"]="$CONTAINER_REGISTRY_PASSWORD"
+        ["SharedLogAnalyticsId"]="$LOG_ANALYTICS_ID"
+    )
+
+    # Loop through secrets and set each one
+    for secret_name in "${!secrets[@]}"; do
+        secret_value="${secrets[$secret_name]}"
+        
+        if [[ -z "$secret_value" ]]; then
+            echo "  Skipping $secret_name — value is empty"
+            continue
+        fi
+
+        echo "  Setting secret: $secret_name"
+       
+        set +e
+        results=$(az keyvault secret set \
+            --vault-name "$key_vault_name" \
+            --name "$secret_name" \
+            --value "$secret_value" \
+            --only-show-errors 2>&1)
+        set -e
+        
+        if [ "$debug" -eq 1 ]; then
+            echo "$results" >> "${project_root}/.deploy_log/az_keyvault_secret_set_$secret_name.json"
+        fi
+
+        # Check for errors in the results
+        if grep -q "ERROR" <<< "$results"; then
+            echo "Setting secret $secret_name failed due to an error."
+            echo "$results"
+            exit 1
+        fi
+
+        echo "  Secret $secret_name set successfully."
+        
+    done
+
+
+    # az keyvault secret set --vault-name "$key_vault_name" --name "SharedArtifactStorageAccount" --value "$ARTIFACT_STORAGE_ACCOUNT"
+    # az keyvault secret set --vault-name "$key_vault_name" --name "SharedArtifactStorageAccountKey" --value "$ARTIFACT_STORAGE_ACCOUNT_KEY"
+    # az keyvault secret set --vault-name "$key_vault_name" --name "SharedArtifactContainer" --value "$ARTIFACT_CONTAINER"
+    # az keyvault secret set --vault-name "$key_vault_name" --name "SharedContainerRegistryName" --value "$CONTAINER_REGISTRY_NAME"
+    # az keyvault secret set --vault-name "$key_vault_name" --name "SharedContainerRegistryUsername" --value "$CONTAINER_REGISTRY_USERNAME"
+    # az keyvault secret set --vault-name "$key_vault_name" --name "SharedContainerRegistryPassword" --value "$CONTAINER_REGISTRY_PASSWORD"
+    # az keyvault secret set --vault-name "$key_vault_name" --name "SharedLogAnalyticsId" --value "$LOG_ANALYTICS_ID"
+
+    echo "Output variables saved to Key Vault ${key_vault_name}" >&2
+}
 
 # Parameters
 while getopts "d" opt; do
@@ -340,6 +438,7 @@ storage_account_name="${storage_account_name:0:24}"
 artifact_container=shared-artifacts
 container_registry_name="crcommon${resource_token}${short_env}"
 container_registry_username="ci-build-pullpush"
+key_vault_name="kv-common-${ENVIRONMENT}"
 
 # Configure debug logging
 if [ "$debug" -eq 1 ]; then
@@ -362,3 +461,5 @@ provision_rg
 provision_container_registry
 provision_artifact_storage
 provision_monitoring
+provision_key_vault
+save_outputs_to_keyvault

@@ -52,7 +52,4 @@ jobs:
       - name: Create Resources
         id: task-create-resources
         run: |
-
-          echo ${{ inputs.target }}
-          
           ./script/devops_provision_shared.sh
