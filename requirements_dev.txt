@@ -9,9 +9,9 @@ httpx==0.28.1
 isort==7.0.0
 pre_commit==4.3.0
 prettier==0.0.7
-pydocstyle==2.14.0
+pydocstyle==6.3.0
 pylint==4.0.2
-pytest==1.2.0
+pytest==8.4.2
 pytest-asyncio==1.2.0
 pytest-env==1.2.0
 pytest-cov==7.0.0
