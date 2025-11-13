@@ -2,7 +2,7 @@
 #########################################################################
 # Create An Azure Active Directory application, with a service principal
 # Configure role assignments.
-# Confgiure OpenId Connect (OIDC) based Federated Identity Credentials
+# Configure OpenId Connect (OIDC) based Federated Identity Credentials
 # Globals:
 #   SUBSCRIPTION_ID
 #   GITHUB_ORG
@@ -53,7 +53,7 @@ assign_role(){
     if [ -n "$role_id" ]; then
         echo "Role $role_name already exists." >&2
     else
-        echo "Creating role $role_name with definition:\n$role_definition" >&2
+        printf "Creating role %s with definition:\n%s\n" "$role_name" "$role_definition" >&2
 
         set +e
         results=$(az role definition create \
@@ -105,11 +105,7 @@ project_root="$(git rev-parse --show-toplevel)"
 env_file="${project_root}/.env"
 project_name=$(grep -oP '(?<=^name = ")[^"]+' "${project_root}/pyproject.toml"  | tr -d '\n')
 project_short_name=$(grep -oP '(?<=^short_name = ")[^"]+' "${project_root}/pyproject.toml"  | tr -d '\n')
-application_service_number=$(grep -oP '(?<=^application_service_number = ")[^"]+' "${project_root}/pyproject.toml" | tr -d '\n')
-application_owner=$(grep -oP '(?<=^application_owner = ")[^"]+' "${project_root}/pyproject.toml" | tr -d '\n')
-resource_token=$(echo -n "${SUBSCRIPTION_ID}${project_name}${LOCATION}" | sha1sum | awk '{print $1}' | cut -c1-8)
 short_env=$(echo "${ENVIRONMENT:0:1}" | tr '[:upper:]' '[:lower:]')
-tags="asn=$application_service_number project=$project_name owner=$application_owner environment=$ENVIRONMENT"
 
 run_date=$(date +%Y%m%dT%H%M%S)
 isa_date_utc=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
@@ -205,8 +201,8 @@ fi
 
 echo "Assigning roles to the service principal..." >&2
 
-# Custome Role - Resource Group Creator
-role_name=$(cat "${project_root}/docs/ad_resource_group_creator_role.json" | jq -r '.Name')
+# Custom Role - Resource Group Creator
+role_name=$(jq -r '.Name' "${project_root}/docs/ad_resource_group_creator_role.json")
 response=$(az role assignment list --assignee "$app_sp_id" --role "$role_name")
 if [[ $response == '[]' ]]; then
     role_definition=$("$project_root"/script/render_role_template.sh -i "${project_root}/docs/ad_resource_group_creator_role.json" -v ASSIGNABLE_SCOPE="/subscriptions/$SUBSCRIPTION_ID")

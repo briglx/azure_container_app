@@ -4,15 +4,40 @@ run-name: "${{ github.event_name == 'workflow_dispatch' && format('CI: {0}', git
 on:
     workflow_dispatch:
         inputs:
-            full:
-                description: "Full run (regardless of changes)"
+            build_and_push:
+                description: "Build and Push Docker"
                 default: false
                 type: boolean
 
 jobs:
+    lint:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Check out code from GitHub
+              uses: actions/checkout@v5
+
+            - name: Set up Python
+              uses: actions/setup-python@v4
+              with:
+                python-version: '3.9'
+
+            - name: Install dependencies
+              run: |
+                python -m pip install --upgrade pip
+                pip install ${{ github.workspace }}/dev_requirements.txt
+
+            - name: Lint code
+              run: |
+                codespell "${{ github.workspace }}""
+                shellcheck -x ${{ github.workspace }}/script/*.sh
     build_and_push_docker_image:
         runs-on: ubuntu-latest
         environment: dev
+        if: |
+          !failure() && !cancelled() &&
+          (
+            github.event.inputs.build_and_push == 'true'
+          )
         steps:
             - name: Check out code from GitHub
               uses: actions/checkout@v5

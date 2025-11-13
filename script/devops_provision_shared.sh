@@ -410,7 +410,13 @@ save_outputs_to_keyvault(){
     echo "Saving output variables to Key Vault ${key_vault_name}" >&2
 
     # Load environment variables
-    source "$env_file"
+    if [ -f "$env_file" ]; then
+        # shellcheck source=/dev/null
+        source "$env_file"
+    else
+        echo "Environment file $env_file not found!" >&2
+        exit 1
+    fi
 
     declare -A secrets=(
         ["SharedArtifactStorageAccount"]="$ARTIFACT_STORAGE_ACCOUNT"
