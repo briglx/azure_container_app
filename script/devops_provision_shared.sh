@@ -80,126 +80,152 @@ provision_artifact_storage(){
     if [ -z "$ARTIFACT_STORAGE_ACCOUNT" ]; then
         echo "ARTIFACT_STORAGE_ACCOUNT is not set. Creating a new one $storage_account_name" >&2
 
+        # Check if the resource already exists
         set +e
-        results=$(az storage account create \
-            --name "$storage_account_name" \
-            --location "$LOCATION" \
-            --resource-group "$rg_common_name" \
-            --sku Standard_LRS \
-            --allow-blob-public-access false \
-            --tags "$tags" \
-            --only-show-errors 2>&1)
+        resource=$(az storage account show --name "$storage_account_name" --only-show-errors 2>/dev/null)
+        exit_code=$?
         set -e
 
-        if [ "$debug" -eq 1 ]; then
-            echo "$results" >> "${project_root}/.deploy_log/az_storage_account_create.json"
+        if [[ $exit_code -eq 0 && -n "$resource" ]]; then
+            echo "$storage_account_name already exists" >&2
+        else
+
+            # Create if not exists
+            set +e
+            results=$(az storage account create \
+                --name "$storage_account_name" \
+                --location "$LOCATION" \
+                --resource-group "$rg_common_name" \
+                --sku Standard_LRS \
+                --allow-blob-public-access false \
+                --tags "$tags" \
+                --only-show-errors 2>&1)
+            set -e
+
+            if [ "$debug" -eq 1 ]; then
+                echo "$results" >> "${project_root}/.deploy_log/az_storage_account_create.json"
+            fi
+
+            # Check for errors in the results
+            if grep -q "ERROR" <<< "$results"; then
+                echo "Storage Account deployment failed due to an error."
+                echo "$results"
+                exit 1
+            fi
+
+            # Check the provisioning state
+            is_valid=$(jq -r '.provisioningState' <<< "$results")
+            if [ "$is_valid" != "Succeeded" ]
+            then
+                echo "Storage Account Deployment failed. Provisioning state is not 'Succeeded'."
+                echo "$results"
+                exit 1
+            fi
         fi
-
-        # Check for errors in the results
-        if grep -q "ERROR" <<< "$results"; then
-            echo "Storage Account deployment failed due to an error."
-            echo "$results"
-            exit 1
-        fi
-
-        # Check the provisioning state
-        is_valid=$(jq -r '.provisioningState' <<< "$results")
-        if [ "$is_valid" != "Succeeded" ]
-        then
-            echo "Storage Account Deployment failed. Provisioning state is not 'Succeeded'."
-            echo "$results"
-            exit 1
-        fi
-
-        app_storage_key=$(az storage account keys list \
-            --resource-group "$rg_common_name" \
-            --account-name "$storage_account_name" \
-            --query '[0].value' \
-            --output tsv)
-
-        set +e
-        results=$( az storage container create \
-            --name "$artifact_container" \
-            --account-name "$storage_account_name" \
-            --account-key "$app_storage_key" \
-            --only-show-errors 2>&1)
-        set -e
-
-        if [ "$debug" -eq 1 ]; then
-            echo "$results" >> "${project_root}/.deploy_log/az_storage_container_create.json"
-        fi
-
-        # Check for errors in the results
-        if grep -q "ERROR" <<< "$results"; then
-            echo "Container deployment failed due to an error."
-            echo "$results"
-            exit 1
-        fi
-
-        echo "Save output variables to ${env_file}" >&2
-        {
-            echo ""
-            echo "# devops_provision_shared.sh Provision output variables"
-            echo "# Generated on ${isa_date_utc}"
-            echo "ARTIFACT_STORAGE_ACCOUNT=$storage_account_name"
-            echo "ARTIFACT_STORAGE_ACCOUNT_KEY=$app_storage_key"
-            echo "ARTIFACT_CONTAINER=$artifact_container"
-        }>> "$env_file"
-    
     else
         echo "ARTIFACT_STORAGE_ACCOUNT already exists" >&2
+        storage_account_name="$ARTIFACT_STORAGE_ACCOUNT"
     fi
+
+    # Create Artifact Container
+    echo "Creating Artifact Container $artifact_container in Storage Account $storage_account_name" >&2
+    app_storage_key=$(az storage account keys list \
+        --resource-group "$rg_common_name" \
+        --account-name "$storage_account_name" \
+        --query '[0].value' \
+        --output tsv)
+
+    set +e
+    results=$( az storage container create \
+        --name "$artifact_container" \
+        --account-name "$storage_account_name" \
+        --account-key "$app_storage_key" \
+        --only-show-errors 2>&1)
+    set -e
+
+    if [ "$debug" -eq 1 ]; then
+        echo "$results" >> "${project_root}/.deploy_log/az_storage_container_create.json"
+    fi
+
+    # Check for errors in the results
+    if grep -q "ERROR" <<< "$results"; then
+        echo "Container deployment failed due to an error."
+        echo "$results"
+        exit 1
+    fi
+
+    echo "Save output variables to ${env_file}" >&2
+    {
+        echo ""
+        echo "# devops_provision_shared.sh Provision output variables"
+        echo "# Generated on ${isa_date_utc}"
+        echo "ARTIFACT_STORAGE_ACCOUNT=$storage_account_name"
+        echo "ARTIFACT_STORAGE_ACCOUNT_KEY=$app_storage_key"
+        echo "ARTIFACT_CONTAINER=$artifact_container"
+    }>> "$env_file"
+
 }
 
 provision_container_registry(){
     echo "Provisioning Container Registry for shared resources" >&2
+
     if [ -z "$CONTAINER_REGISTRY_NAME" ]; then
         echo "CONTAINER_REGISTRY_NAME is not set. Creating a new one" >&2
 
+        # Check if the resource already exists
         set +e
-        results=$(az acr create \
-            --resource-group "$rg_common_name" \
-            --name "$container_registry_name" \
-            --sku Basic \
-            --location "$LOCATION" \
-            --tags "$tags" \
-            --only-show-errors 2>&1)
+        resource=$(az acr show --name "$container_registry_name" --only-show-errors 2>/dev/null)
+        exit_code=$?
         set -e
-        
-        if [ "$debug" -eq 1 ]; then
-            echo "$results" >> "${project_root}/.deploy_log/az_acr_create.json"
-        fi
 
-        # Check for errors in the results
-        if grep -q "ERROR" <<< "$results"; then
-            echo "Container Registry Deployment failed due to an error."
-            echo "$results"
-            exit 1
-        fi
+        if [[ $exit_code -eq 0 && -n "$resource" ]]; then
+            echo "$container_registry_name already exists" >&2
+        else
 
-        # Check the provisioning state
-        is_valid=$(jq -r '.provisioningState' <<< "$results")
-        if [ "$is_valid" != "Succeeded" ]
-        then
-            echo "Container Registry Deployment failed. Provisioning state is not 'Succeeded'."
-            echo "$results"
-            exit 1
-        fi
-
-        CONTAINER_REGISTRY_NAME="$container_registry_name"
-
-        echo "Save Container Registry output variables to ${env_file}" >&2
-        {
-            echo ""
-            echo "# devops_provision_shared.sh Container Registry Provision output variables"
-            echo "# Generated on ${isa_date_utc}"
-            echo "CONTAINER_REGISTRY_NAME=$CONTAINER_REGISTRY_NAME"
+            # Create if not exists
+            set +e
+            results=$(az acr create \
+                --resource-group "$rg_common_name" \
+                --name "$container_registry_name" \
+                --sku Basic \
+                --location "$LOCATION" \
+                --tags "$tags" \
+                --only-show-errors 2>&1)
+            set -e
             
-        }>> "$env_file"
+            if [ "$debug" -eq 1 ]; then
+                echo "$results" >> "${project_root}/.deploy_log/az_acr_create.json"
+            fi
 
+            # Check for errors in the results
+            if grep -q "ERROR" <<< "$results"; then
+                echo "Container Registry Deployment failed due to an error."
+                echo "$results"
+                exit 1
+            fi
+
+            # Check the provisioning state
+            is_valid=$(jq -r '.provisioningState' <<< "$results")
+            if [ "$is_valid" != "Succeeded" ]
+            then
+                echo "Container Registry Deployment failed. Provisioning state is not 'Succeeded'."
+                echo "$results"
+                exit 1
+            fi
+        fi
     else
         echo "CONTAINER_REGISTRY_NAME already exists" >&2
+        container_registry_name="$CONTAINER_REGISTRY_NAME"
     fi
+
+    echo "Save Container Registry output variables to ${env_file}" >&2
+    {
+        echo ""
+        echo "# devops_provision_shared.sh Container Registry Provision output variables"
+        echo "# Generated on ${isa_date_utc}"
+        echo "CONTAINER_REGISTRY_NAME=$container_registry_name"
+        
+    }>> "$env_file"
     
 
     # Configure Repo Permissions
@@ -207,48 +233,65 @@ provision_container_registry(){
     if [ -z "$CONTAINER_REGISTRY_USERNAME" ]; then
         echo "CONTAINER_REGISTRY_USERNAME is not set. Creating a new one" >&2
 
+        # Check if the resource already exists
         set +e
-        results=$(az acr token create \
-            --name "$container_registry_username" \
-            --registry "$CONTAINER_REGISTRY_NAME" \
-            --scope-map _repositories_push_metadata_write \
-            --output json \
-            --only-show-errors 2>&1)
+        resource=$(az keyacr token show --name "$container_registry_username" --registry "$container_registry_name" --only-show-errors 2>/dev/null)
+        exit_code=$?
         set -e
 
-        if [ "$debug" -eq 1 ]; then
-            echo "$results" >> "${project_root}/.deploy_log/az_acr_token_create.json"
+        if [[ $exit_code -eq 0 && -n "$resource" ]]; then
+            echo "$container_registry_username already exists" >&2
+        else
+    
+            set +e
+            results=$(az acr token create \
+                --name "$container_registry_username" \
+                --registry "$container_registry_name" \
+                --scope-map _repositories_push_metadata_write \
+                --output json \
+                --only-show-errors 2>&1)
+            set -e
+
+            if [ "$debug" -eq 1 ]; then
+                echo "$results" >> "${project_root}/.deploy_log/az_acr_token_create.json"
+            fi
+
+            # Check for errors in the results
+            if grep -q "ERROR" <<< "$results"; then
+                echo "Container Registry Deployment failed due to an error."
+                echo "$results"
+                exit 1
+            fi
+
+            # Check the provisioning state
+            is_valid=$(jq -r '.provisioningState' <<< "$results")
+            if [ "$is_valid" != "Succeeded" ]
+            then
+                echo "Container Registry Token Deployment failed. Provisioning state is not 'Succeeded'."
+                echo "$results"
+                exit 1
+            fi
+
+            CONTAINER_REGISTRY_PASSWORD=$(echo "$results" | jq -r '.credentials.passwords[0].value')
+            echo "Save Container Registry Token output variables to ${env_file}" >&2
+            {
+                echo ""
+                echo "# devops_provision_shared.sh Container Registry Token Provision output variables"
+                echo "# Generated on ${isa_date_utc}"
+                echo "CONTAINER_REGISTRY_PASSWORD=$CONTAINER_REGISTRY_PASSWORD"
+            }>> "$env_file"
         fi
-
-        # Check for errors in the results
-        if grep -q "ERROR" <<< "$results"; then
-            echo "Container Registry Deployment failed due to an error."
-            echo "$results"
-            exit 1
-        fi
-
-        # Check the provisioning state
-        is_valid=$(jq -r '.provisioningState' <<< "$results")
-        if [ "$is_valid" != "Succeeded" ]
-        then
-            echo "Container Registry Token Deployment failed. Provisioning state is not 'Succeeded'."
-            echo "$results"
-            exit 1
-        fi
-
-        CONTAINER_REGISTRY_PASSWORD=$(echo "$results" | jq -r '.credentials.passwords[0].value')
-        echo "Save Container Registry Token output variables to ${env_file}" >&2
-        {
-            echo ""
-            echo "# devops_provision_shared.sh Container Registry Token Provision output variables"
-            echo "# Generated on ${isa_date_utc}"
-            echo "CONTAINER_REGISTRY_USERNAME=$container_registry_username"
-            echo "CONTAINER_REGISTRY_PASSWORD=$CONTAINER_REGISTRY_PASSWORD"
-        }>> "$env_file"
-
     else
         echo "CONTAINER_REGISTRY_USERNAME already exists" >&2
     fi
+
+    echo "Save Container Registry output variables to ${env_file}" >&2
+    {
+        echo ""
+        echo "# devops_provision_shared.sh Container Registry Token Provision output variables"
+        echo "# Generated on ${isa_date_utc}"
+        echo "CONTAINER_REGISTRY_USERNAME=$container_registry_username"
+    }>> "$env_file"
 }
 
 provision_monitoring(){
@@ -257,44 +300,55 @@ provision_monitoring(){
     if [ -z "$LOG_ANALYTICS_ID" ]; then
         echo "LOG_ANALYTICS_ID is not set. Creating a new one $log_analytics_name" >&2
 
+        # Check if the resource already exists
         set +e
-        results=$(az monitor log-analytics workspace create \
-            --resource-group "$rg_common_name" \
-            --workspace-name "$log_analytics_name" \
-            --location "$LOCATION" \
-            --sku PerGB2018 \
-            --tags "$tags" \
-            --only-show-errors 2>&1)
+        resource=$(az monitor log-analytics workspace show --name "$log_analytics_name" --only-show-errors 2>/dev/null)
+        exit_code=$?
         set -e
-        
-        if [ "$debug" -eq 1 ]; then
-            echo "$results" >> "${project_root}/.deploy_log/az_monitor_loganalytics_workspace_create.json"
-        fi
 
-        # Check for errors in the results
-        if grep -q "ERROR" <<< "$results"; then
-            echo "Deployment failed due to an error."
-            echo "$results"
-            exit 1
-        fi
+        if [[ $exit_code -eq 0 && -n "$resource" ]]; then
+            echo "$log_analytics_name already exists" >&2
+        else
 
-        # Check the provisioning state
-        is_valid=$(jq -r '.provisioningState' <<< "$results")
-        if [ "$is_valid" != "Succeeded" ]
-        then
-            echo "Deployment failed. Provisioning state is not 'Succeeded'."
-            echo "$results"
-            exit 1
-        fi
+            set +e
+            results=$(az monitor log-analytics workspace create \
+                --resource-group "$rg_common_name" \
+                --workspace-name "$log_analytics_name" \
+                --location "$LOCATION" \
+                --sku PerGB2018 \
+                --tags "$tags" \
+                --only-show-errors 2>&1)
+            set -e
+            
+            if [ "$debug" -eq 1 ]; then
+                echo "$results" >> "${project_root}/.deploy_log/az_monitor_loganalytics_workspace_create.json"
+            fi
 
-        LOG_ANALYTICS_ID=$(echo "$results" | jq -r '.id')
-        echo "Save output variables to ${env_file}" >&2
-        {
-            echo ""
-            echo "# devops_provision_shared.sh Provision output variables"
-            echo "# Generated on ${isa_date_utc}"
-            echo "LOG_ANALYTICS_ID=\"$LOG_ANALYTICS_ID\""
-        }>> "$env_file"
+            # Check for errors in the results
+            if grep -q "ERROR" <<< "$results"; then
+                echo "Deployment failed due to an error."
+                echo "$results"
+                exit 1
+            fi
+
+            # Check the provisioning state
+            is_valid=$(jq -r '.provisioningState' <<< "$results")
+            if [ "$is_valid" != "Succeeded" ]
+            then
+                echo "Deployment failed. Provisioning state is not 'Succeeded'."
+                echo "$results"
+                exit 1
+            fi
+
+            LOG_ANALYTICS_ID=$(echo "$results" | jq -r '.id')
+            echo "Save output variables to ${env_file}" >&2
+            {
+                echo ""
+                echo "# devops_provision_shared.sh Provision output variables"
+                echo "# Generated on ${isa_date_utc}"
+                echo "LOG_ANALYTICS_ID=\"$LOG_ANALYTICS_ID\""
+            }>> "$env_file"
+        fi
        
     else
         echo "LOG_ANALYTICS_ID already exists" >&2
@@ -303,17 +357,20 @@ provision_monitoring(){
 
 provision_key_vault(){
     echo "Provisioning Key Vault for shared resources" >&2
-    # Placeholder for Key Vault provisioning logic
-
 
     if [ -z "$KEY_VAULT_NAME" ]; then
+        echo "KEY_VAULT_NAME is not set. Creating a new one $key_vault_name" >&2
 
-        # Check if the key_vault_name already exists
-        kv_exists=$(az keyvault list --query "[?name=='$key_vault_name'] | length(@)" --output tsv)
-        if [ "$kv_exists" -gt 0 ]; then
+        # Check if the resource already exists
+        set +e
+        resource=$(az keyvault show --name "$key_vault_name" --only-show-errors 2>/dev/null)
+        exit_code=$?
+        set -e
+
+        if [[ $exit_code -eq 0 && -n "$resource" ]]; then
             echo "$key_vault_name already exists" >&2
         else
-            echo "KEY_VAULT_NAME is not set. Creating a new one $key_vault_name" >&2
+            
             set +e
             results=$(az keyvault create \
                 --name "$key_vault_name" \
@@ -338,11 +395,22 @@ provision_key_vault(){
         echo "KEY_VAULT_NAME already exists" >&2
         key_vault_name="$KEY_VAULT_NAME"
     fi
+
+    echo "Save output variables to ${env_file}" >&2
+    {
+        echo ""
+        echo "# devops_provision_shared.sh Provision output variables"
+        echo "# Generated on ${isa_date_utc}"
+        echo "KEY_VAULT_NAME=$key_vault_name"
+    }>> "$env_file"
 }
 
 # Save output variables to keyvault
 save_outputs_to_keyvault(){
     echo "Saving output variables to Key Vault ${key_vault_name}" >&2
+
+    # Load environment variables
+    source "$env_file"
 
     declare -A secrets=(
         ["SharedArtifactStorageAccount"]="$ARTIFACT_STORAGE_ACCOUNT"
@@ -387,15 +455,6 @@ save_outputs_to_keyvault(){
         echo "  Secret $secret_name set successfully."
         
     done
-
-
-    # az keyvault secret set --vault-name "$key_vault_name" --name "SharedArtifactStorageAccount" --value "$ARTIFACT_STORAGE_ACCOUNT"
-    # az keyvault secret set --vault-name "$key_vault_name" --name "SharedArtifactStorageAccountKey" --value "$ARTIFACT_STORAGE_ACCOUNT_KEY"
-    # az keyvault secret set --vault-name "$key_vault_name" --name "SharedArtifactContainer" --value "$ARTIFACT_CONTAINER"
-    # az keyvault secret set --vault-name "$key_vault_name" --name "SharedContainerRegistryName" --value "$CONTAINER_REGISTRY_NAME"
-    # az keyvault secret set --vault-name "$key_vault_name" --name "SharedContainerRegistryUsername" --value "$CONTAINER_REGISTRY_USERNAME"
-    # az keyvault secret set --vault-name "$key_vault_name" --name "SharedContainerRegistryPassword" --value "$CONTAINER_REGISTRY_PASSWORD"
-    # az keyvault secret set --vault-name "$key_vault_name" --name "SharedLogAnalyticsId" --value "$LOG_ANALYTICS_ID"
 
     echo "Output variables saved to Key Vault ${key_vault_name}" >&2
 }
