@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #########################################################################
-# Onboard and manage application on cloud infrastructure.
-# Usage: provision_shared.sh 
+# Onboard and manage shared cloud infrastructure.
+# Usage: devops_provision_shared.sh 
 # Globals:
 #   SUBSCRIPTION_ID
 #   ENVIRONMENT

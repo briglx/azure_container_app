@@ -121,6 +121,31 @@ az functionapp deployment source config-zip \
     --timeout 120
 ```
 
+Finish Deploying Resources after app is deployed
+```bash    
+
+# It is expected that the destination endpoint to be already created and available for use before executing any Event Grid command.
+az eventgrid system-topic event-subscription create \
+    --name "$eventgrid_event_subscription_name" \
+    --resource-group "$rg_name" \
+    --system-topic-name "$eventgrid_system_topic_name" \
+    --endpoint "https://${FUNC_APP_NAME}.azurewebsites.net/runtime/webhooks/blobs?functionName=Host.Functions.${FUNC_NAME}&code=${FUNC_KEY}" \
+    --endpoint-type webhook \
+    --included-event-types Microsoft.Storage.BlobCreated
+
+# Test
+timestamp=$(date +'%Y%m%d%H%M%S')
+test_file="test_$timestamp"
+touch "$test_file"
+az storage blob upload \
+    --container-name "$APP_STORAGE_CONTAINER" \
+    --file "$test_file" \
+    --name "${APP_STORAGE_INPUT_PATH}/${test_file}" \
+    --account-name "$APP_STORAGE_ACCOUNT_NAME" \
+    --account-key "$APP_STORAGE_KEY"
+```
+
+
 ## References
 * https://learn.microsoft.com/en-us/azure/azure-functions/flex-consumption-plan
 * https://learn.microsoft.com/en-us/azure/azure-functions/functions-event-grid-blob-trigger?pivots=programming-language-python
