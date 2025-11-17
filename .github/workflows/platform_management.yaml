@@ -37,6 +37,7 @@ jobs:
       LOCATION: ${{ vars.LOCATION }}
       AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
       SUBSCRIPTION_ID: ${{ secrets.SUBSCRIPTION_ID }}
+      KEY_VAULT_NAME: ${{ vars.KEY_VAULT_NAME }}
       
     if: |
       !failure() && !cancelled() && 
