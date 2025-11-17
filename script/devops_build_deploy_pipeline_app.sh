@@ -6,21 +6,58 @@
 #   SUBSCRIPTION_ID
 #   ENVIRONMENT
 #   LOCATION
-# Optional Globals:
 #   MODEL_NAME
 #   MODEL_VERSION
 #   APP_INSTALLER_FILE
 #   APP_FILE
 #   APP_SETUP_ARGS
 #   APP_ALIAS
+# Optional Globals:
 # Params
 #########################################################################
 
 # Stop on errors
 set -e
 
+# Validate required environment variables
+if [ -z "$SUBSCRIPTION_ID" ]; then
+    echo "Error: SUBSCRIPTION_ID is not set. Please set the Azure Subscription ID." >&2
+    exit 1
+fi
+if [ -z "$ENVIRONMENT" ]; then
+    echo "Error: ENVIRONMENT is not set. Please set the deployment environment (e.g., dev, test, prod)." >&2
+    exit 1
+fi
+if [ -z "$LOCATION" ]; then
+    echo "Error: LOCATION is not set. Please set the Azure region/location." >&2
+    exit 1
+fi
+if [ -z "$MODEL_NAME" ]; then
+    echo "Error: MODEL_NAME is not set. Please set the Key Vault name." >&2
+    exit 1
+fi
+if [ -z "$MODEL_VERSION" ]; then
+    echo "Error: MODEL_VERSION is not set. Please set the Key Vault name." >&2
+    exit 1
+fi
+if [ -z "$APP_INSTALLER_FILE" ]; then
+    echo "Error: APP_INSTALLER_FILE is not set. Please set the Key Vault name." >&2
+    exit 1
+fi
+if [ -z "$APP_FILE" ]; then
+    echo "Error: APP_FILE is not set. Please set the Key Vault name." >&2
+    exit 1
+fi
+if [ -z "$APP_SETUP_ARGS" ]; then
+    echo "Error: APP_SETUP_ARGS is not set. Please set the Key Vault name." >&2
+    exit 1
+fi
+if [ -z "$APP_ALIAS" ]; then
+    echo "Error: APP_ALIAS is not set. Please set the Key Vault name." >&2
+    exit 1
+fi
+
 project_root="$(git rev-parse --show-toplevel)"
-project_name=$(grep -oP '(?<=^name = ")[^"]+' "${project_root}/pyproject.toml"  | tr -d '\n')
 project_version=$(grep -oP '(?<=^version = ")[^"]+' "${project_root}/pyproject.toml"  | tr -d '\n')
 
 model_name="$MODEL_NAME"
