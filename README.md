@@ -72,7 +72,7 @@ Solution Resources
 * Function app - See [func_app](./func_app/README.md)
 * Event Grid
 ```bash
-./script/devops_provision_shared.sh
+./script/devops_provision.sh
 ```
 
 This approach uses a centralized artifact store for binaries. Blob storage account is the artifact store

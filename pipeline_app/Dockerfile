@@ -42,4 +42,5 @@ RUN ln -s "${APP_FILE}" "/usr/local/bin/$APP_ALIAS"
 
 COPY ./pipeline_app/entrypoint.sh ./pipeline_app/build_args.sh /app/
 
-ENTRYPOINT [ "./entrypoint.sh" ]
+# ENTRYPOINT [ "./entrypoint.sh" ]
+ENTRYPOINT [ "/bin/bash" ]

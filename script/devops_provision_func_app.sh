@@ -43,7 +43,7 @@ while getopts "k:s:c:i:o:" opt; do
   esac
 done
 
-project_root=$(pwd) # Running in project root
+project_root="$(git rev-parse --show-toplevel)"
 env_file="${project_root}/.env"
 project_name=$(grep -oP '(?<=^name = ")[^"]+' "${project_root}/pyproject.toml"  | tr -d '\n')
 short_name=$(grep -oP '(?<=^short_name = ")[^"]+' "${project_root}/pyproject.toml"  | tr -d '\n')
