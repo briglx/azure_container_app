@@ -273,6 +273,7 @@ done
 echo "Done setting up Function App webhook."
 
 # # Depends on the Function App being already deployed and available
+echo "Creating Event Grid Event Subscription: $eventgrid_event_subscription_name" >&2
 az eventgrid system-topic event-subscription create \
     --name "$eventgrid_event_subscription_name" \
     --resource-group "$rg_name" \
