@@ -61,11 +61,12 @@ jobs:
               run: |
 
                 ARTIFACT_SAS_TOKEN=$(az storage container generate-sas \
-                  --account-name "$ARTIFACT_STORAGE_ACCOUNT" \
-                  --account-key "${{ vars.ARTIFACT_STORAGE_KEY }}" \
-                  --name "$ARTIFACT_CONTAINER" \
+                  --name "${{ vars.ARTIFACT_CONTAINER }}" \
+                  --auth-mode key \
+                  --account-key "${{ secrets.ARTIFACT_STORAGE_KEY }}" \
+                  --account-name "${{ vars.ARTIFACT_STORAGE_ACCOUNT }}" \
                   --permission r \
-                  --expiry $(date -u -d "2 minutes" '+%Y-%m-%dT%H:%MZ') \
+                  --expiry $(date -u -d "5 minutes" '+%Y-%m-%dT%H:%MZ') \
                   --output tsv 2>&1)
                   
                 artifact_path="https://${{ vars.ARTIFACT_STORAGE_ACCOUNT }}.blob.core.windows.net/${{ vars.ARTIFACT_CONTAINER }}/${{ vars.ARTIFACT_FOLDER }}/${{ vars.ARTIFACT_NAME }}?${ARTIFACT_SAS_TOKEN}"

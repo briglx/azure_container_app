@@ -102,11 +102,12 @@ The build pipeline
 # Get Artifact Storage SAS Key
 set +e
 ARTIFACT_SAS_TOKEN=$(az storage container generate-sas \
-    --account-name "$ARTIFACT_STORAGE_ACCOUNT" \
-    --account-key "$ARTIFACT_STORAGE_KEY" \
     --name "$ARTIFACT_CONTAINER" \
+    --auth-mode key \
+    --account-key "$ARTIFACT_STORAGE_KEY" \
+    --account-name "$ARTIFACT_STORAGE_ACCOUNT" \
     --permission r \
-    --expiry $(date -u -d "1 hour" '+%Y-%m-%dT%H:%MZ') \
+    --expiry $(date -u -d "5 minutes" '+%Y-%m-%dT%H:%MZ') \
     --output tsv 2>&1)
 set -e
 
