@@ -103,11 +103,10 @@ The build pipeline
 set +e
 ARTIFACT_SAS_TOKEN=$(az storage container generate-sas \
     --account-name "$ARTIFACT_STORAGE_ACCOUNT" \
+    --account-key "$ARTIFACT_STORAGE_KEY" \
     --name "$ARTIFACT_CONTAINER" \
     --permission r \
     --expiry $(date -u -d "1 hour" '+%Y-%m-%dT%H:%MZ') \
-    --auth-mode login \
-    --as-user \
     --output tsv 2>&1)
 set -e
 
