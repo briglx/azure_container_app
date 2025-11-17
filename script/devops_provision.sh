@@ -57,13 +57,8 @@ project_name=$(grep -oP '(?<=^name = ")[^"]+' "${project_root}/pyproject.toml"  
 short_name=$(grep -oP '(?<=^short_name = ")[^"]+' "${project_root}/pyproject.toml"  | tr -d '\n')
 application_service_number=$(grep -oP '(?<=^application_service_number = ")[^"]+' "${project_root}/pyproject.toml" | tr -d '\n')
 application_owner=$(grep -oP '(?<=^application_owner = ")[^"]+' "${project_root}/pyproject.toml" | tr -d '\n')
-resource_token=$(echo -n "${SUBSCRIPTION_ID}${project_name}${LOCATION}" | sha1sum | awk '{print $1}' | cut -c1-8)
 short_env=$(echo "${ENVIRONMENT:0:1}" | tr '[:upper:]' '[:lower:]')
 tags="asn=$application_service_number project=$project_name owner=$application_owner environment=$ENVIRONMENT"
-
-run_date=$(date +%Y%m%dT%H%M%S)
-isa_date_utc=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
-deployment_name="${project_name}.Provisioning-Shared.${run_date}"
 
 # Variables
 debug=${debug:-0}
@@ -259,12 +254,11 @@ fi
 # done
 
 test_webhook_url="https://$FUNC_APP_NAME.azurewebsites.net/admin/functions/$FUNC_NAME?code=${FUNC_KEY_MASTER}"
-webhook_url="https://${FUNC_APP_NAME}.azurewebsites.net/runtime/webhooks/blobs?functionName=Host.Functions.${FUNC_NAME}&code=${FUNC_KEY}"
+webhook_url="https://${FUNC_APP_NAME}.azurewebsites.net/runtime/runtime/webhooks/EventGrid?functionName=${FUNC_NAME}&code=${FUNC_KEY}"
 
 echo "Checking webhook readiness..."
 for i in {1..10}; do
     response=$(curl -s -w "\n%{http_code}" "$test_webhook_url")
-    body=$(echo "$response" | head -n -1)
     code=$(echo "$response" | tail -n 1)
 
     if [[ "$code" == "200" || "$code" == "202" ]]; then
@@ -283,7 +277,7 @@ az eventgrid system-topic event-subscription create \
     --name "$eventgrid_event_subscription_name" \
     --resource-group "$rg_name" \
     --system-topic-name "$eventgrid_system_topic_name" \
-    --endpoint "https://${FUNC_APP_NAME}.azurewebsites.net/runtime/runtime/webhooks/EventGrid?functionName=${FUNC_NAME}&code=${FUNC_KEY}" \
+    --endpoint "$webhook_url" \
     --endpoint-type webhook \
     --included-event-types Microsoft.Storage.BlobCreated
 

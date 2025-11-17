@@ -57,7 +57,7 @@ jobs:
       - name: Create Resources
         id: task-create-resources
         run: |
-          ./script/devops_provision_solution.sh
+          ./script/devops_provision.sh
   Provision_Shared_Resources:
     name: Provision Shared Resources
     runs-on: ubuntu-latest

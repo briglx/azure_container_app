@@ -13,18 +13,14 @@
 #    -c, APP_STORAGE_CONTAINER
 #    -i, APP_STORAGE_INPUT_PATH
 #    -o, APP_STORAGE_OUTPUT_PATH
-#    -d, Debug mode
 #########################################################################
 
 # Stop on errors
 set -e
 
 # Parameters
-while getopts "k:s:c:i:o:d" opt; do
+while getopts "k:s:c:i:o:" opt; do
   case $opt in
-    d)
-        debug=1
-        ;;
     k)
         shared_key_vault_name="$OPTARG"
         ;;
@@ -41,7 +37,7 @@ while getopts "k:s:c:i:o:d" opt; do
         app_storage_output_path="$OPTARG"
         ;;
     *)
-      echo "Usage: $0 -k shared_key_vault_name [-d]"
+      echo "Usage: $0 -k shared_key_vault_name"
       exit 1
       ;;
   esac
@@ -49,12 +45,13 @@ done
 
 project_root=$(pwd) # Running in project root
 env_file="${project_root}/.env"
-project_name=$(cat "${project_root}/pyproject.toml" | grep -oP '(?<=^name = ")[^"]+' | tr -d '\n')
-short_name=$(cat "${project_root}/pyproject.toml" | grep -oP '(?<=^short_name = ")[^"]+' | tr -d '\n')
-project_version=$(cat "${project_root}/pyproject.toml" | grep -oP '(?<=^version = ")[^"]+' | tr -d '\n')
+project_name=$(grep -oP '(?<=^name = ")[^"]+' "${project_root}/pyproject.toml"  | tr -d '\n')
+short_name=$(grep -oP '(?<=^short_name = ")[^"]+' "${project_root}/pyproject.toml"  | tr -d '\n')
 resource_token=$(echo -n "${SUBSCRIPTION_ID}${project_name}${LOCATION}" | sha1sum | awk '{print $1}' | cut -c1-8)
 short_env=$(echo "${ENVIRONMENT:0:1}" | tr '[:upper:]' '[:lower:]')
 tags="asn=tbd project=$project_name owner=tbd environment=$ENVIRONMENT servicetier=tier3"
+
+isa_date_utc=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
 
 base_name="${short_name}-${ENVIRONMENT}-${LOCATION}"
 rg_name="rg-${base_name//_/-}"
@@ -65,8 +62,6 @@ funcapp_storage_account_name="${funcapp_storage_account_name//[^a-z0-9]/}"
 funcapp_storage_account_name="${funcapp_storage_account_name:0:24}"
 
 application_insights_name="appi-${short_name}-${short_env}-${resource_token}"
-
-funcapp_plan_name="plan-${short_name}-${short_env}-${resource_token}"
 
 funcapp_name="func-${short_name}-${short_env}-${resource_token}"
 funcapp_name="${funcapp_name:0:24}"
@@ -173,7 +168,7 @@ mkdir -p "$(dirname "$zip_file_path")"
 
 pushd "$source_folder"
 
-zip -r "$zip_file_path" *.py host.json requirements.txt
+zip -r "$zip_file_path" ./*.py host.json requirements.txt
 
 az functionapp deployment source config-zip \
     --src "$zip_file_path" \
