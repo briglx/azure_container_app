@@ -288,12 +288,12 @@ az eventgrid system-topic event-subscription create \
     --included-event-types Microsoft.Storage.BlobCreated
 
 # # Test
-timestamp=$(date +'%Y%m%d%H%M%S')
-test_file="test_$timestamp"
-touch "$test_file"
-az storage blob upload \
-    --container-name "$APP_STORAGE_CONTAINER" \
-    --file "$test_file" \
-    --name "${APP_STORAGE_INPUT_PATH}/${test_file}" \
-    --account-name "$APP_STORAGE_ACCOUNT_NAME" \
-    --account-key "$APP_STORAGE_KEY"
+# timestamp=$(date +'%Y%m%d%H%M%S')
+# test_file="test_$timestamp"
+# touch "$test_file"
+# az storage blob upload \
+#     --container-name "$APP_STORAGE_CONTAINER" \
+#     --file "$test_file" \
+#     --name "${APP_STORAGE_INPUT_PATH}/${test_file}" \
+#     --account-name "$APP_STORAGE_ACCOUNT_NAME" \
+#     --account-key "$APP_STORAGE_KEY"
