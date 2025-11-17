@@ -20,13 +20,8 @@
 set -e
 
 project_root="$(git rev-parse --show-toplevel)"
-env_file="${project_root}/.env"
 project_name=$(grep -oP '(?<=^name = ")[^"]+' "${project_root}/pyproject.toml"  | tr -d '\n')
 project_version=$(grep -oP '(?<=^version = ")[^"]+' "${project_root}/pyproject.toml"  | tr -d '\n')
-short_name=$(grep -oP '(?<=^short_name = ")[^"]+' "${project_root}/pyproject.toml"  | tr -d '\n')
-resource_token=$(echo -n "${SUBSCRIPTION_ID}${project_name}${LOCATION}" | sha1sum | awk '{print $1}' | cut -c1-8)
-short_env=$(echo "${ENVIRONMENT:0:1}" | tr '[:upper:]' '[:lower:]')
-tags="asn=tbd project=$project_name owner=tbd environment=$ENVIRONMENT servicetier=tier3"
 
 model_name="$MODEL_NAME"
 model_version="$MODEL_VERSION"
