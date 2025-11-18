@@ -191,7 +191,7 @@ az container create \
     --resource-group "$ACI_RESOURCE_GROUP" \
     --name "$ACI_NAME" \
     --image "${CONTAINER_REGISTRY_NAME}.azurecr.io/${CONTAINER_REGISTRY_NAMESPACE}/${image}:${version}" \
-    --cpu 1 --memory 2 \
+    --cpu 2 --memory 4 \
     --restart-policy Never \
     --os-type Linux \
     --registry-login-server "${CONTAINER_REGISTRY_NAME}.azurecr.io" \

@@ -13,6 +13,11 @@ on:
         type: boolean
         required: false
 
+      deployContainer:
+        description: "Deploy Container Instance"
+        type: boolean
+        required: false
+
       target:
         description: "Environment to deploy to"
         required: true
@@ -89,3 +94,32 @@ jobs:
         id: task-create-resources
         run: |
           ./script/devops_provision_shared.sh
+  Deploy_Container_Instance:
+    name: Deploy Container Instance
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.target }}
+    env:
+      ENVIRONMENT: ${{ vars.ENVIRONMENT  }}
+      LOCATION: ${{ vars.LOCATION }}
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      SUBSCRIPTION_ID: ${{ secrets.SUBSCRIPTION_ID }}
+    if : |
+      !failure() && !cancelled() && 
+      (
+        github.event.inputs.deployContainer == 'true'
+      )
+    steps:
+      - name: Check out code from GitHub
+        uses: actions/checkout@v5
+
+      - name: OIDC Login to Azure
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.CICD_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.SUBSCRIPTION_ID }}
+
+      - name: Deploy Container Instance
+        id: task-deploy-container
+        run: |
+          echo "Deploying Container Instance to $ENVIRONMENT"
