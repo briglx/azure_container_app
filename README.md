@@ -112,44 +112,18 @@ target_file="${ARTIFACT_FOLDER}/${ARTIFACT_NAME}"
 
 ### Build docker image
 ```bash
-# Configure image version
-model_name="$MODEL_NAME"
-model_version="$MODEL_VERSION"
-image="${model_name}_v${model_version}"
-
-proj_version="${PROJ_VERSION}"
-build_number=$(date +%Y%m%dT%H%M)
-version="${proj_version}.dev${build_number}"
-
-image_name="${image}:${version}"
-
-project_root=$(git rev-parse --show-toplevel)
-dockerfile_path="${project_root}/pipeline_app/Dockerfile"
-
-# Build image
-DOCKER_BUILDKIT=1 docker buildx build \
-    --platform linux/amd64 \
-    --build-arg "RELEASE_VERSION=$version" \
-    --build-arg "APP_INSTALLER_FILE=$APP_INSTALLER_FILE" \
-    --build-arg "APP_FILE=$APP_FILE" \
-    --build-arg "APP_SETUP_ARGS=$APP_SETUP_ARGS"  \
-    --build-arg "APP_ALIAS=$APP_ALIAS" \
-    -t "$image_name" -f "${dockerfile_path}" "${project_root}"
+./script/devops.sh build_image \
+    --channel dev
 ```
 
 ### Push image
 
 ```bash
 # Login to remote registry
-docker login -u "$CONTAINER_REGISTRY_USERNAME" -p "$CONTAINER_REGISTRY_PASSWORD" "${CONTAINER_REGISTRY_NAME}.azurecr.io"
+# docker login -u "$CONTAINER_REGISTRY_USERNAME" -p "$CONTAINER_REGISTRY_PASSWORD" "${CONTAINER_REGISTRY_NAME}.azurecr.io"
 
-# Tag image
-docker tag "${image}:${version}" "${image}:latest"
-docker tag "${image}:${version}" "${CONTAINER_REGISTRY_NAME}.azurecr.io/${CONTAINER_REGISTRY_NAMESPACE}/${image}:${version}"
-docker tag "${image}:latest" "${CONTAINER_REGISTRY_NAME}.azurecr.io/${CONTAINER_REGISTRY_NAMESPACE}/${image}:latest"
-
-docker push "${CONTAINER_REGISTRY_NAME}.azurecr.io/${CONTAINER_REGISTRY_NAMESPACE}/${image}:${version}"
-docker push "${CONTAINER_REGISTRY_NAME}.azurecr.io/${CONTAINER_REGISTRY_NAMESPACE}/${image}:latest"
+./script/devops.sh publish_image \
+    --version "$IMAGE_VERSION"
 ```
 
 ### Deploy Configs

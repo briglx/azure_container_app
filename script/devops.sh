@@ -58,9 +58,18 @@ show_help() {
     echo "      -c, --container-name   (Optional) Blob container name. Default: "$DEFAULT_ARTIFACT_CONTAINER""
     echo "      -n, --name             (Optional) Target name in blob storage. Default: "${SHORT_NAME}/artifact.zip""
     echo ""
+    echo "   build_image Build a Docker image for the application."
+    echo "      -n, --name             Name of the Docker image to build."
+    echo "      -l, --channel          Release channel (dev or release). Default: "$CHANNEL_DEV""
+    echo ""
+    echo "   publish_image Publish a Docker image to Azure Container Registry."
+    echo "      -v, --version          Version tag for the Docker image."
+    echo ""
     echo "Example usage:"
     echo "  $0 upload_artifact -a mystorageaccount -k myaccountkey -c mycontainer -f ./local/artifact.zip -n myfolder/myartifact.zip"
     echo "  $0 fetch_artifact -a mystorageaccount -k myaccountkey -c mycontainer -n myfolder/myartifact.zip"
+    echo "  $0 build_image -n myappimage -l dev"
+    echo "  $0 publish_image -v 1.0.0"
 }
 
 validate_parameters(){
@@ -171,6 +180,32 @@ validate_fetch_artifact_parameters(){
 
 }
 
+validate_build_image_parameters(){
+
+    if [ -z "$APP_INSTALLER_FILE" ]
+    then
+        log_error "usage error: APP_INSTALLER_FILE is required." >&2
+        show_help
+        exit 1
+    fi
+
+    if [ -z "$APP_FILE" ]
+    then
+        log_error "usage error: APP_FILE is required." >&2
+        show_help
+        exit 1
+    fi
+
+    if [ -z "$APP_SETUP_ARGS" ]
+    then
+        log_error "usage error: APP_SETUP_ARGS is required." >&2
+        show_help
+        exit 1
+    fi
+
+}
+
+
 upload_artifact(){
     local local_file="$1"
     local account_name="$2"
@@ -226,29 +261,12 @@ fetch_artifact(){
     local account_key="$2"
     local container_name="$3"
     local artifact_name="$4"
+    local results
     local artifact_sas_token
     local artifact_path
 
     log_info "Fetch artifact."
     log_debug "Fetch artifact from ${account_name}/${container_name}/${artifact_name}."
-
-    # # Fetch Artifact
-    # artifact_sas_token=$(az storage container generate-sas \
-    #     --name "${ARTIFACT_CONTAINER}" \
-    #     --auth-mode key \
-    #     --account-key "${ARTIFACT_STORAGE_KEY}" \
-    #     --account-name "${ARTIFACT_STORAGE_ACCOUNT}" \
-    #     --permission r \
-    #     --expiry "$(date -u -d "5 minutes" '+%Y-%m-%dT%H:%MZ')" \
-    #     --output tsv 2>&1)
-        
-    # artifact_path="https://${ARTIFACT_STORAGE_ACCOUNT}.blob.core.windows.net/${ARTIFACT_CONTAINER}/${ARTIFACT_FOLDER}/${ARTIFACT_NAME}?${artifact_sas_token}"
-    
-    # # Create temp directory and download artifact
-    # mkdir -p .artifact_cache
-    # curl -fsSL "${artifact_path}" -o "${ARTIFACT_NAME}"
-    # unzip -q "${ARTIFACT_NAME}" -d .artifact_cache
-
 
     # Fetch Artifact
     set +e
@@ -333,6 +351,8 @@ get_keyvault_secret() {
     local secret_name="$2"
     local secret_value
 
+    log_info "Retrieving secret '$secret_name' from vault '$vault_name'"
+
     if ! secret_value=$(az keyvault secret show \
         --name "$secret_name" \
         --vault-name "$vault_name" \
@@ -351,9 +371,8 @@ get_keyvault_secret() {
 }
 
 login_acr(){
-    local key_vault_name="${1:-${SHARED_KEY_VAULT_NAME:-}}"
+    local key_vault_name="${1:-${KEY_VAULT_NAME:-}}"
     
-
     # Validate input
     if [[ -z "$key_vault_name" ]]; then
         log_error "Key Vault name not provided. Pass as argument or set SHARED_KEY_VAULT_NAME"
@@ -395,7 +414,21 @@ login_acr(){
 }
 
 build_image(){
-    log_info "Building ${image_name} with ${dockerfile_path}" >&2
+    local channel="$1"
+
+    log_info "Building image for ${channel}"
+
+    # Determine build version
+    if [ "$channel" == "$CHANNEL_RELEASE" ]; then
+        version="${PROJECT_VERSION}"
+    else
+        version="${PROJECT_VERSION}.dev${BUILD_NUMBER}"
+    fi
+
+    image_name="${IMAGE}:${version}"
+    dockerfile_path="${PROJECT_ROOT}/pipeline_app/Dockerfile"
+
+    log_debug "Building image: $image_name for dockerfile_path: $dockerfile_path."
 
     # Build image
     DOCKER_BUILDKIT=1 docker buildx build \
@@ -407,33 +440,49 @@ build_image(){
         --build-arg "APP_ALIAS=$APP_ALIAS" \
         -t "$image_name" -f "${dockerfile_path}" "${PROJECT_ROOT}"
 
+
+    # Record build version
+    # Get the output variables from the deployment
+    log_info "Save output variables to ${ENV_FILE}"
+    {
+        echo ""
+        echo "# Script $SCRIPT_NAME - build_image - output variables."
+        echo "# Generated on ${ISO_DATE_UTC}"
+        echo "IMAGE_VERSION=${version}"
+    }>> "$ENV_FILE"
+
+    log_info "Successfully built image: $image_name"
+
 }
 
 publish_image(){
-    local name="$1"
-    local deployment_name="${name}.PublishImage-${run_date}"
+    local version="$1"
     local dev_tags=("${version}" "dev")
     local release_tags=("${version}" "latest")
 
-    log_info "Publishing ${deployment_name} for version ${version} and channel ${channel}"
-
-    if [ "$channel" == "dev" ]
+    if [ "$channel" == "$CHANNEL_RELEASE" ]
     then
-        tags=("${dev_tags[@]}")
-    else
         tags=("${release_tags[@]}")
+    else
+        tags=("${dev_tags[@]}")
     fi
 
     # Tag images with extra tags
     for tag in "${tags[@]}"; do
-        docker tag "${name}:${version}" "${name}:${tag}"
+        docker tag "${IMAGE}:${version}" "${IMAGE}:${tag}"
     done
+
+    if ! registry_name=$(get_keyvault_secret "$KEY_VAULT_NAME" "SharedContainerRegistryName"); then
+        return 2
+    fi
 
     # Push Images
     for tag in "${tags[@]}"; do
-        docker tag "${name}:${tag}" "${registry}/${namespace}/${name}:${tag}"
-        docker push "${registry}/${namespace}/${name}:${tag}"
+        docker tag "${IMAGE}:${tag}" "${registry_name}.azurecr.io/${CONTAINER_REGISTRY_NAMESPACE}/${IMAGE}:${tag}"
+        docker push "${registry_name}.azurecr.io/${CONTAINER_REGISTRY_NAMESPACE}/${IMAGE}:${tag}"
     done
+
+    log_info "Successfully published image: ${IMAGE} with tags: ${tags[*]}"
 
 }
 
@@ -443,8 +492,13 @@ publish_image(){
 # - ALL_CAPS with underscores
 #########################################################################
 # SUBSCRIPTION_ID="${SUBSCRIPTION_ID:-}"
-# MODEL_NAME="${MODEL_NAME:-}"
-# MODEL_VERSION="${MODEL_VERSION:-}"
+MODEL_NAME="${MODEL_NAME:-}"
+MODEL_VERSION="${MODEL_VERSION:-}"
+APP_INSTALLER_FILE="${APP_INSTALLER_FILE:-}"
+APP_FILE="${APP_FILE:-}"
+APP_SETUP_ARGS="${APP_SETUP_ARGS:-}"
+APP_ALIAS="${APP_ALIAS:-}"
+KEY_VAULT_NAME="${KEY_VAULT_NAME:-}"
 
 #########################################################################
 # SCRIPT CONSTANTS (internal, read-only)
@@ -458,13 +512,16 @@ readonly PROJECT_VERSION=$(grep -oP '(?<=^version = ")[^"]+' "${PROJECT_ROOT}/py
 readonly SCRIPT_NAME="$(basename "$0")"
 readonly IMAGE="${MODEL_NAME}_v${MODEL_VERSION}"
 readonly BUILD_NUMBER=$(date +%Y%m%dT%H%M)
-readonly VERSION="${PROJECT_VERSION}.dev${BUILD_NUMBER}"="${PROJECT_VERSION}.dev${BUILD_NUMBER}"
-readonly IMAGE_NAME="${IMAGE}:${VERSION}"
 readonly DOCKERFILE="${PROJECT_ROOT}/pipeline_app/Dockerfile"
+readonly CONTAINER_REGISTRY_NAMESPACE="aimodelserving"
+readonly ENV_FILE="${PROJECT_ROOT}/.env"
 # Log levels
 readonly LOG_ERROR=0
 readonly LOG_INFO=1
 readonly LOG_DEBUG=2
+# Release Channels
+readonly CHANNEL_DEV="dev"
+readonly CHANNEL_RELEASE="release"
 # Color codes
 readonly RED='\033[0;31m'
 readonly GREEN='\033[0;32m'
@@ -474,8 +531,8 @@ readonly NC='\033[0m'
 readonly DEFAULT_ARTIFACT_NAME="${SHORT_NAME}/artifact.zip"
 readonly DEFAULT_ARTIFACT_CONTAINER=shared-artifacts
 # Command-line options
-readonly LONGOPTS=account-name:,account-key:,container-name:,file:,name:,debug,help
-readonly OPTIONS=a:k:c:f:n:dh
+readonly LONGOPTS=account-name:,account-key:,channel:,container-name:,file:,name:,version:,debug,help
+readonly OPTIONS=a:k:l:c:f:n:v:dh
 
 #########################################################################
 # SCRIPT GLOBAL VARIABLES (internal, mutable)
@@ -485,10 +542,12 @@ readonly OPTIONS=a:k:c:f:n:dh
 # Command-line arguments
 account_name=""
 account_key=""
+channel="$CHANNEL_DEV"
 container_name=""
 file=""
 log_level="$LOG_INFO"
 name=""
+version=""
 
 log_info "Starting $SCRIPT_NAME"
 
@@ -507,6 +566,10 @@ while true; do
             ;;
         -k|--account-key)
             account_key="$2"
+            shift 2
+            ;;
+        -l|--channel)
+            channel="$2"
             shift 2
             ;;
         -c|--container-name)
@@ -528,6 +591,10 @@ while true; do
         -h|--help)
             show_help
             exit
+            ;;
+        -v|--version)
+            version="$2"
+            shift 2
             ;;
         --)
             shift
@@ -559,12 +626,14 @@ case "$command" in
         exit 0
         ;;
     build_image)
-        build_image
+        validate_build_image_parameters "$@"
+        build_image "$channel"
         exit 0
         ;;
     publish_image)
-        validate_publish_parameters "$@"
-        publish_image "$name" "$VERSION" "$channel" "$namespace" "$registry"
+       
+        login_acr
+        publish_image "$version"
         exit 0
         ;;
     *)
@@ -574,9 +643,6 @@ case "$command" in
         ;;
 esac
 
-
-# validate_provision_parameters
-# fetch_artifact
 
 # # Publish image
 # login_acr "$KEY_VAULT_NAME"
