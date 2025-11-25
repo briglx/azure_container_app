@@ -79,13 +79,16 @@ This approach uses a centralized artifact store for binaries. Blob storage accou
 ```bash
 # Download your binary that needs to be deployed in the container as ARTIFACT_NAME. 
 curl /path/to/files -o "$ARTIFACT_NAME"
+
 # Upload to a shared artifact location in blob storage
-az storage blob upload \
+local_file="/path/to/$ARTIFACT_NAME"
+target_file="${ARTIFACT_FOLDER}/${ARTIFACT_NAME}"
+./script/devops.sh upload_artifact \
+    --file "$local_file" \
     --account-name "$ARTIFACT_STORAGE_ACCOUNT" \
+    --account-key "$ARTIFACT_STORAGE_ACCOUNT_KEY" \
     --container-name "$ARTIFACT_CONTAINER" \
-    --file "$ARTIFACT_NAME"
-    --name "$ARTIFACT_NAME" \
-    --account-key "$ARTIFACT_STORAGE_ACCOUNT_KEY"
+    --name "$target_file"
 ```
 
 ## Build and Deploy the Artifact
@@ -99,24 +102,12 @@ The build pipeline
 
 ### Fetch Artifact
 ```bash
-# Get Artifact Storage SAS Key
-set +e
-ARTIFACT_SAS_TOKEN=$(az storage container generate-sas \
-    --name "$ARTIFACT_CONTAINER" \
-    --auth-mode key \
-    --account-key "$ARTIFACT_STORAGE_KEY" \
+target_file="${ARTIFACT_FOLDER}/${ARTIFACT_NAME}"
+./script/devops.sh fetch_artifact \
     --account-name "$ARTIFACT_STORAGE_ACCOUNT" \
-    --permission r \
-    --expiry $(date -u -d "5 minutes" '+%Y-%m-%dT%H:%MZ') \
-    --output tsv 2>&1)
-set -e
-
-artifact_path="https://${ARTIFACT_STORAGE_ACCOUNT}.blob.core.windows.net/${ARTIFACT_CONTAINER}/${ARTIFACT_FOLDER}/${ARTIFACT_NAME}?${ARTIFACT_SAS_TOKEN}"
-
-rm -Rf .artifact_cache
-mkdir -p .artifact_cache
-curl -fsSL "${artifact_path}" -o "${ARTIFACT_NAME}"
-unzip -q "${ARTIFACT_NAME}" -d .artifact_cache
+    --account-key "$ARTIFACT_STORAGE_ACCOUNT_KEY" \
+    --container-name "$ARTIFACT_CONTAINER" \
+    --name "$target_file"
 ```
 
 ### Build docker image
