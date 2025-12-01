@@ -2,7 +2,7 @@
 
 Example project demonstrating an automated workflow for file processing. Uploading a file triggers a containerized application that processes the file and writes results back to the storage account. 
 
-![Architecture Overview](./docs/architecture_overview.drawio.png)
+![Architecture Overview](./docs/architecture_overview.drawio.svg)
 
 # Getting Started
 
@@ -14,9 +14,9 @@ The solution use system identities to deploy cloud resources. The following tabl
 
 | System Identities                 | Authentication                                             | Authorization                                                                                                                                                                  | Purpose                                                                            |
 | --------------------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------- |
-| `env.AZURE_CICD_CLIENT_NAME`      | OpenId Connect (OIDC) based Federated Identity Credentials | <ul><li>Subscription Contributor OR Owner OR</li><li>Storage Account Contributor, Storage Account Key Operator Service Role, Storage Blob Data Contributor, AcrPush, Monitoring Contributor OR</li><li>Custom Role</li><li><ul><li>`Microsoft.Resources/subscriptions/resourceGroups/write`</li><li>`Microsoft.Storage/storageAccounts/write`</li><li>`Microsoft.Storage/storageAccounts/listKeys/action`</li><li>`Microsoft.Storage/storageAccounts/blobServices/containers/write`</li><li>`Microsoft.ContainerRegistry/registries/write`</li><li>`Microsoft.ContainerRegistry/registries/tokens/write`</li><li>`Microsoft.OperationalInsights/workspaces/write`</li></ul>  | Deploy Shared resources: <ul><li>Resource Group</li><li>Storage Account</li><li>Container Registry</li><li>Log Analytics Workspace</li></ul></li></ul> |
+| `env.CICD_CLIENT_NAME`      | OpenId Connect (OIDC) based Federated Identity Credentials | <ul><li>Subscription Contributor OR Owner OR</li><li>Storage Account Contributor, Storage Account Key Operator Service Role, Storage Blob Data Contributor, AcrPush, Monitoring Contributor OR</li><li>Custom Role</li><li><ul><li>`Microsoft.Resources/subscriptions/resourceGroups/write`</li><li>`Microsoft.Storage/storageAccounts/write`</li><li>`Microsoft.Storage/storageAccounts/listKeys/action`</li><li>`Microsoft.Storage/storageAccounts/blobServices/containers/write`</li><li>`Microsoft.ContainerRegistry/registries/write`</li><li>`Microsoft.ContainerRegistry/registries/tokens/write`</li><li>`Microsoft.OperationalInsights/workspaces/write`</li></ul>  | Deploy Shared resources: <ul><li>Resource Group</li><li>Storage Account</li><li>Container Registry</li><li>Log Analytics Workspace</li></ul></li></ul> |
 
-Role Detail for `env.AZURE_CICD_CLIENT_NAME` to provision shared resources
+Role Detail for `env.CICD_CLIENT_NAME` to provision shared resources
 
 | Permission Scope | Purpose | Built in Role | Least Privlage |
 | --- | --- | --- | --- |
@@ -141,6 +141,10 @@ for config_file in "${config_files[@]}"; do
         --account-key "$APP_STORAGE_KEY" \
         --account-name "$APP_STORAGE_ACCOUNT_NAME"
 done
+
+# Or via devops
+./script/devops.sh upload_pipeline_config \
+
 ```
 
 ### Deploy to Azure Container Instance

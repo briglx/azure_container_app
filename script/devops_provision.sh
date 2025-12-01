@@ -191,6 +191,7 @@ app_storage_connection_string=$(az storage account show-connection-string \
     --resource-group "$rg_name" \
     --query "connectionString" -o tsv)
 
+# Provision Function App
 "${project_root}/script/devops_provision_func_app.sh" \
     -k "$KEY_VAULT_NAME" \
     -s "$app_storage_connection_string" \

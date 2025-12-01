@@ -323,28 +323,6 @@ fetch_artifact(){
 
 }
 
-# build_docker_image(){
-#     # Configure image version
-#     local version="$1"
-#     local app_installer_file="$2"
-#     local app_file="$3"
-#     local app_setup_args="$4"
-#     local app_alias="$5"
-#     local image_name="$6"
-#     local dockerfile_path="$7"
-#     local PROJECT_ROOT="$8"
-
-#     # Build image
-#     echo DOCKER_BUILDKIT=1 docker buildx build \
-#         --platform linux/amd64 \
-#         --build-arg "RELEASE_VERSION=$version" \
-#         --build-arg "APP_INSTALLER_FILE=${app_installer_file}" \
-#         --build-arg "APP_FILE=${app_file}" \
-#         --build-arg "APP_SETUP_ARGS=${app_setup_args}"  \
-#         --build-arg "APP_ALIAS=${app_alias}" \
-#         -t "$image_name" -f "${dockerfile_path}" "${PROJECT_ROOT}"
-# }
-
 # Retrieve secret from Azure Key Vault
 get_keyvault_secret() {
     local vault_name="$1"
@@ -631,7 +609,6 @@ case "$command" in
         exit 0
         ;;
     publish_image)
-       
         login_acr
         publish_image "$version"
         exit 0
@@ -642,9 +619,3 @@ case "$command" in
         exit 1
         ;;
 esac
-
-
-# # Publish image
-# login_acr "$KEY_VAULT_NAME"
-
-# publish_image "$SHORT_NAME"
