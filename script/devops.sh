@@ -48,21 +48,26 @@ show_help() {
     echo "  upload_artifact Upload an artifact to Azure Blob Storage."
     echo "      -a, --account-name     Storage account name"
     echo "      -k, --account-key      Storage account key"
-    echo "      -c, --container-name   (Optional) Blob container name. Default: "$DEFAULT_ARTIFACT_CONTAINER""
+    echo "      -c, --container-name   (Optional) Blob container name. Default: $DEFAULT_ARTIFACT_CONTAINER"
     echo "      -f, --file             Local file path to upload"
-    echo "      -n, --name             (Optional) Target name in blob storage. Default: "${SHORT_NAME}/artifact.zip""
+    echo "      -n, --name             (Optional) Target name in blob storage. Default: ${SHORT_NAME}/artifact.zip"
     echo ""
     echo "  fetch_artifact Fetch an artifact from Azure Blob Storage."
     echo "      -a, --account-name     Storage account name"
     echo "      -k, --account-key      Storage account key"
-    echo "      -c, --container-name   (Optional) Blob container name. Default: "$DEFAULT_ARTIFACT_CONTAINER""
-    echo "      -n, --name             (Optional) Target name in blob storage. Default: "${SHORT_NAME}/artifact.zip""
+    echo "      -c, --container-name   (Optional) Blob container name. Default: $DEFAULT_ARTIFACT_CONTAINER"
+    echo "      -n, --name             (Optional) Target name in blob storage. Default: ${SHORT_NAME}/artifact.zip"
     echo ""
     echo "   build_image Build a Docker image for the application."
     echo "      -n, --name             Name of the Docker image to build."
-    echo "      -l, --channel          Release channel (dev or release). Default: "$CHANNEL_DEV""
+    echo "      -l, --channel          Release channel (dev or release). Default: $CHANNEL_DEV"
     echo ""
     echo "   publish_image Publish a Docker image to Azure Container Registry."
+    echo "      -v, --version          Version tag for the Docker image."
+    echo ""
+    echo "   upload_pipeline_config Upload pipeline configuration to Azure Blob Storage."
+    ecoh ""
+    echo "   deploy_container_instance Deploy the Docker image to Azure Container Instances."
     echo "      -v, --version          Version tag for the Docker image."
     echo ""
     echo "Example usage:"
@@ -70,6 +75,8 @@ show_help() {
     echo "  $0 fetch_artifact -a mystorageaccount -k myaccountkey -c mycontainer -n myfolder/myartifact.zip"
     echo "  $0 build_image -n myappimage -l dev"
     echo "  $0 publish_image -v 1.0.0"
+    echo "  $0 upload_pipeline_config"
+    echo "  $0 deploy_container_instance -v 1.0.0"
 }
 
 validate_parameters(){
@@ -78,47 +85,6 @@ validate_parameters(){
     then
         log_error "COMMAND is required." >&2
         show_help
-        exit 1
-    fi
-}
-
-validate_provision_parameters(){
-
-    # Validate required environment variables
-    if [ -z "$SUBSCRIPTION_ID" ]; then
-        log_error "SUBSCRIPTION_ID is not set. Please set the Azure Subscription ID." >&2
-        exit 1
-    fi
-    if [ -z "$ENVIRONMENT" ]; then
-        log_error "ENVIRONMENT is not set. Please set the deployment environment (e.g., dev, test, prod)." >&2
-        exit 1
-    fi
-    if [ -z "$LOCATION" ]; then
-        log_error "LOCATION is not set. Please set the Azure region/location." >&2
-        exit 1
-    fi
-    if [ -z "$MODEL_NAME" ]; then
-        log_error "MODEL_NAME is not set. Please set the Key Vault name." >&2
-        exit 1
-    fi
-    if [ -z "$MODEL_VERSION" ]; then
-        log_error "MODEL_VERSION is not set. Please set the Key Vault name." >&2
-        exit 1
-    fi
-    if [ -z "$APP_INSTALLER_FILE" ]; then
-        log_error "APP_INSTALLER_FILE is not set. Please set the Key Vault name." >&2
-        exit 1
-    fi
-    if [ -z "$APP_FILE" ]; then
-        log_error "APP_FILE is not set. Please set the Key Vault name." >&2
-        exit 1
-    fi
-    if [ -z "$APP_SETUP_ARGS" ]; then
-        log_error "APP_SETUP_ARGS is not set. Please set the Key Vault name." >&2
-        exit 1
-    fi
-    if [ -z "$APP_ALIAS" ]; then
-        log_error "APP_ALIAS is not set. Please set the Key Vault name." >&2
         exit 1
     fi
 }
@@ -205,6 +171,17 @@ validate_build_image_parameters(){
 
 }
 
+validate_deploy_container_instance_parameters(){
+
+    if [ -z "$version" ]
+    then
+        log_error "usage error: --version is required." >&2
+        show_help
+        exit 1
+    fi
+
+}
+
 
 upload_artifact(){
     local local_file="$1"
@@ -217,7 +194,7 @@ upload_artifact(){
     log_debug "Upload artifact $local_file to ${account_name}/${container_name}/${target_name}."
 
     set +e
-    results=$(az storage blob upload \
+    result=$(az storage blob upload \
         --account-name "$account_name" \
         --container-name "$container_name" \
         --file "$local_file" \
@@ -228,31 +205,31 @@ upload_artifact(){
         --no-progress 2>&1)
     set -e
 
-    log_debug "$results"
+    log_debug "$result"
     
     # Save file if LOG_DEBUG is enabled
     if [[ $log_level -ge $LOG_DEBUG ]]; then
         log_debug "Saving result to az_storage_blob_upload.log."
-        echo $results >> "${PROJECT_ROOT}/.deploy_log/az_storage_blob_upload.log"
+        echo "$result" >> "${PROJECT_ROOT}/.deploy_log/az_storage_blob_upload.log"
     fi
 
-    # Check for errors in the results
-    if grep -q "ERROR" <<< "$results"; then
+    # Check for errors in the result
+    if grep -q "ERROR" <<< "$result"; then
         log_error "${command^} failed due to an error."
-        log_error "$results"
+        log_error "$result"
         exit 1
     fi
 
     # Check if success message is present
-    last_modified=$(echo "$results" | jq -r '.lastModified')
+    last_modified=$(echo "$result" | jq -r '.lastModified')
     if [[ -z "$last_modified" || "$last_modified" == "null" ]]; then
         log_error "${command^} failed. No lastModified timestamp found."
-        log_error "$results"
+        log_error "$result"
         exit 1
     fi
     
-    log_info "Succesfully uploaded artifact." 
-    log_debug "Succesfully uploaded artifact ${artifact_name} uploaded to ${account_name}/${container_name}/${target_name}." 
+    log_info "Successfully uploaded artifact." 
+    log_debug "Successfully uploaded artifact ${artifact_name} uploaded to ${account_name}/${container_name}/${target_name}." 
 
 }
 
@@ -261,7 +238,7 @@ fetch_artifact(){
     local account_key="$2"
     local container_name="$3"
     local artifact_name="$4"
-    local results
+    local result
     local artifact_sas_token
     local artifact_path
 
@@ -270,7 +247,7 @@ fetch_artifact(){
 
     # Fetch Artifact
     set +e
-    results=$(az storage container generate-sas \
+    result=$(az storage container generate-sas \
         --name "${container_name}" \
         --auth-mode key \
         --account-key "${account_key}" \
@@ -281,31 +258,31 @@ fetch_artifact(){
         --output tsv 2>&1)
     set -e
 
-    log_debug "$results"
+    log_debug "$result"
 
     # Save file if LOG_DEBUG is enabled
     if [[ $log_level -ge $LOG_DEBUG ]]; then
         log_debug "Saving result to az_storage_container_generate_sas.log."
-        echo "$results" >> "${PROJECT_ROOT}/.deploy_log/az_storage_container_generate_sas.log"
+        echo "$result" >> "${PROJECT_ROOT}/.deploy_log/az_storage_container_generate_sas.log"
     fi
 
-    # Check for errors in the results
-    if grep -q "ERROR" <<< "$results"; then
+    # Check for errors in the result
+    if grep -q "ERROR" <<< "$result"; then
         log_error "${command^} failed due to an error."
-        log_error "$results"
+        log_error "$result"
         exit 1
     fi
 
     # Check if valid sas token
-    if [[ "$results" == *"sig="* && "$results" == *"se="* ]]; then
+    if [[ "$result" == *"sig="* && "$result" == *"se="* ]]; then
         log_debug "SAS token generated successfully."
     else
         log_error "${command^} failed. Invalid SAS token generated."
-        log_error "$results"
+        log_error "$result"
         exit 1
     fi
 
-    artifact_sas_token="$results"
+    artifact_sas_token="$result"
     artifact_path="https://${account_name}.blob.core.windows.net/${container_name}/${artifact_name}"
     
     # Create temp directory and download artifact
@@ -318,8 +295,8 @@ fetch_artifact(){
     unzip -qo "temp.zip" -d .artifact_cache
     rm -f "temp.zip"
 
-    log_info "Succesfully fetched artifact." 
-    log_debug "Succesfully fetched artifact from ${account_name}/${container_name}/${artifact_name}." 
+    log_info "Successfully fetched artifact." 
+    log_debug "Successfully fetched artifact from ${account_name}/${container_name}/${artifact_name}." 
 
 }
 
@@ -349,30 +326,29 @@ get_keyvault_secret() {
 }
 
 login_acr(){
-    local key_vault_name="${1:-${KEY_VAULT_NAME:-}}"
-    
+
     # Validate input
-    if [[ -z "$key_vault_name" ]]; then
-        log_error "Key Vault name not provided. Pass as argument or set SHARED_KEY_VAULT_NAME"
+    if [[ -z "$KEY_VAULT_NAME" ]]; then
+        log_error "Key Vault name not provided. set KEY_VAULT_NAME"
         return 1
     fi
 
     log_info "Authenticating to Azure Container Registry"
-    log_info "Using Key Vault: $key_vault_name"
+    log_info "Using Key Vault: $KEY_VAULT_NAME"
 
     local registry_name
     local registry_username
     local registry_password
 
-    if ! registry_name=$(get_keyvault_secret "$key_vault_name" "SharedContainerRegistryName"); then
+    if ! registry_name=$(get_keyvault_secret "$KEY_VAULT_NAME" "SharedContainerRegistryName"); then
         return 2
     fi
 
-    if ! registry_username=$(get_keyvault_secret "$key_vault_name" "SharedContainerRegistryUsername"); then
+    if ! registry_username=$(get_keyvault_secret "$KEY_VAULT_NAME" "SharedContainerRegistryUsername"); then
         return 2
     fi
 
-    if ! registry_password=$(get_keyvault_secret "$key_vault_name" "SharedContainerRegistryPassword"); then
+    if ! registry_password=$(get_keyvault_secret "$KEY_VAULT_NAME" "SharedContainerRegistryPassword"); then
         return 2
     fi
 
@@ -404,9 +380,8 @@ build_image(){
     fi
 
     image_name="${IMAGE}:${version}"
-    dockerfile_path="${PROJECT_ROOT}/pipeline_app/Dockerfile"
 
-    log_debug "Building image: $image_name for dockerfile_path: $dockerfile_path."
+    log_debug "Building image: $image_name for dockerfile_path: $DOCKERFILE."
 
     # Build image
     DOCKER_BUILDKIT=1 docker buildx build \
@@ -416,7 +391,7 @@ build_image(){
         --build-arg "APP_FILE=$APP_FILE" \
         --build-arg "APP_SETUP_ARGS=$APP_SETUP_ARGS"  \
         --build-arg "APP_ALIAS=$APP_ALIAS" \
-        -t "$image_name" -f "${dockerfile_path}" "${PROJECT_ROOT}"
+        -t "$image_name" -f "${DOCKERFILE}" "${PROJECT_ROOT}"
 
 
     # Record build version
@@ -464,6 +439,190 @@ publish_image(){
 
 }
 
+upload_pipeline_config(){
+    local app_storage_key
+    local config_files
+    local result
+    local last_modified
+
+    log_info "Starting upload pipeline configuration task."
+
+    # Get storage account key
+    log_info "Retrieving storage account key for account: ${APP_STORAGE_ACCOUNT_NAME}."
+    set +e
+    app_storage_key=$(az storage account keys list \
+        --resource-group "$RG_NAME" \
+        --account-name "$APP_STORAGE_ACCOUNT_NAME" \
+        --query "[0].value" \
+        --output tsv 2>&1)
+    set -e
+
+    config_files=(
+        "$LOCAL_APP_RUNTIME_CONFIG_FILE"
+        "$LOCAL_APP_EXPORT_CONFIG_FILE"
+        "$LOCAL_APP_STATS_CONFIG_FILE"
+    )
+    for config_file in "${config_files[@]}"; do
+        log_info "Uploading configuration file: $config_file to Azure File Share."
+
+        set +e
+        result=$(az storage file upload \
+            --source "$config_file" \
+            --share-name share \
+            --account-key "$app_storage_key" \
+            --account-name "$APP_STORAGE_ACCOUNT_NAME" \
+            --only-show-errors \
+            )
+        set -e
+
+        # Save file if LOG_DEBUG is enabled
+        if [[ $log_level -ge $LOG_DEBUG ]]; then
+            log_debug "Saving result to az_storage_file_upload_$(basename "$config_file").json."
+            echo "$result" >> "${PROJECT_ROOT}/.deploy_log/az_storage_file_upload_$(basename "$config_file").json"
+        fi
+
+        # Check for errors in the result
+        if grep -q "ERROR" <<< "$result"; then
+            log_error "${command^} failed due to an error."
+            log_error "$result"
+            exit 1
+        fi
+
+        # Check if success message is present
+        last_modified=$(echo "$result" | jq -r '.last_modified')
+        if [[ -z "$last_modified" || "$last_modified" == "null" ]]; then
+            log_error "${command^} failed. No last_modified timestamp found."
+            log_error "$result"
+            exit 1
+        fi
+
+        log_info "Successfully uploaded configuration file: $config_file."
+    done
+
+    log_info "Successfully completed pipeline configuration task."
+
+}
+
+deploy_container_instance(){
+    local version="$1"
+    local registry_name
+    local registry_username
+    local registry_password
+    local app_storage_key
+
+    log_info "Deploying container instance for image version: $version"
+
+    # Delete existing container instance if it exists
+    log_info "Checking for existing container instance: ${ACI_NAME} in resource group: ${RG_NAME}."
+    if az container show --resource-group "$RG_NAME" --name "${ACI_NAME}" &>/dev/null; then
+        log_info "Deleting existing container instance: ${ACI_NAME}"
+
+        set +e
+        result=$(az container delete \
+            --resource-group "$RG_NAME" \
+            --name "$ACI_NAME" \
+            --yes \
+            --only-show-errors 2>&1)
+        set -e
+
+        if [[ $log_level -ge $LOG_DEBUG ]]; then
+            log_debug "Saving result to az_container_delete.json."
+            echo "$result" >> "${PROJECT_ROOT}/.deploy_log/az_container_delete.json"
+        fi
+
+        # Check for errors in the result
+        if grep -q "ERROR" <<< "$result"; then
+            log_error "${command^} failed due to an error."
+            log_error "$result"
+            exit 1
+        fi
+
+        log_info "Successfully deleted existing container instance: ${ACI_NAME}."
+    else
+        log_info "No existing container instance found: ${ACI_NAME}."
+    fi
+
+
+    # Get ACR credentials from Key Vault
+    if ! registry_name=$(get_keyvault_secret "$KEY_VAULT_NAME" "SharedContainerRegistryName"); then
+        return 2
+    fi
+
+    if ! registry_username=$(get_keyvault_secret "$KEY_VAULT_NAME" "SharedContainerRegistryUsername"); then
+        return 2
+    fi
+
+    if ! registry_password=$(get_keyvault_secret "$KEY_VAULT_NAME" "SharedContainerRegistryPassword"); then
+        return 2
+    fi
+
+    # Get storage account key
+    log_info "Retrieving storage account key for account: ${APP_STORAGE_ACCOUNT_NAME}."
+    set +e
+    app_storage_key=$(az storage account keys list \
+        --resource-group "$RG_NAME" \
+        --account-name "$APP_STORAGE_ACCOUNT_NAME" \
+        --query "[0].value" \
+        --output tsv 2>&1)
+    set -e
+
+    # Deploy to Azure Container Instances
+    log_info "Creating container instance: ${ACI_NAME} in resource group: ${RG_NAME}."
+    set +e
+    result=$(az container create \
+        --resource-group "$RG_NAME" \
+        --name "$ACI_NAME" \
+        --image "${registry_name}.azurecr.io/${CONTAINER_REGISTRY_NAMESPACE}/${IMAGE}:${version}" \
+        --cpu 2 --memory 4 \
+        --restart-policy Never \
+        --os-type Linux \
+        --registry-login-server "${registry_name}.azurecr.io" \
+        --registry-username "$registry_username" \
+        --registry-password "$registry_password" \
+        --azure-file-volume-account-name "$APP_STORAGE_ACCOUNT_NAME" \
+        --azure-file-volume-account-key "$app_storage_key" \
+        --azure-file-volume-share-name "share" \
+        --azure-file-volume-mount-path /mnt/azurefiles \
+        --environment-variables \
+            APP_RUNTIME_CONFIG_FILE="$APP_RUNTIME_CONFIG_FILE" \
+            APP_EXPORT_CONFIG_FILE="$APP_EXPORT_CONFIG_FILE" \
+            APP_STATS_CONFIG_FILE="$APP_STATS_CONFIG_FILE" \
+            APP_LOG_FILE="$APP_LOG_FILE" \
+        --only-show-errors 2>&1)
+    set -e
+
+    # Save file if LOG_DEBUG is enabled
+    if [[ $log_level -ge $LOG_DEBUG ]]; then
+        log_debug "Saving result to az_container_create.json."
+        echo "$result" >> "${PROJECT_ROOT}/.deploy_log/az_container_create.json"
+    fi
+
+    # Check for errors in the result
+    if grep -q "ERROR" <<< "$result"; then
+        log_error "${command^} failed due to an error."
+        log_error "$result"
+        exit 1
+    fi
+
+    # Check if success message is present
+    container_status=$(echo "$result" | jq -r '.containers[0].instanceView.detailStatus')
+    if [[ -z "$container_status" || "$container_status" == "Error" ]]; then
+        log_error "${command^} failed. Container instance not created successfully."
+        log_error "$result"
+        exit 1
+    fi
+
+    # Check provisioning State
+    provisioning_state=$(echo "$result" | jq -r '.provisioningState')
+    if [[ -z "$provisioning_state" || "$provisioning_state" != "Succeeded" ]]; then
+        log_error "${command^} failed. Provisioning state is not Succeeded."
+        log_error "$result"
+        exit 1
+    fi
+
+    log_info "Successfully deployed container instance for image version: $version"
+
+}
 
 #########################################################################
 # ENVIRONMENT VARIABLES (external, may be set by user)
@@ -477,6 +636,9 @@ APP_FILE="${APP_FILE:-}"
 APP_SETUP_ARGS="${APP_SETUP_ARGS:-}"
 APP_ALIAS="${APP_ALIAS:-}"
 KEY_VAULT_NAME="${KEY_VAULT_NAME:-}"
+ENVIRONMENT="${ENVIRONMENT:-dev}"
+LOCATION="${LOCATION:-westus3}"
+APP_LOG_FILE="${APP_LOG_FILE:-}"
 
 #########################################################################
 # SCRIPT CONSTANTS (internal, read-only)
@@ -484,15 +646,54 @@ KEY_VAULT_NAME="${KEY_VAULT_NAME:-}"
 # - ALWAYS use 'readonly' keyword
 #########################################################################
 # General
-readonly PROJECT_ROOT="$(git rev-parse --show-toplevel)"
-readonly SHORT_NAME=$(grep -oP '(?<=^short_name = ")[^"]+' "${PROJECT_ROOT}/pyproject.toml"  | tr -d '\n')
-readonly PROJECT_VERSION=$(grep -oP '(?<=^version = ")[^"]+' "${PROJECT_ROOT}/pyproject.toml"  | tr -d '\n')
-readonly SCRIPT_NAME="$(basename "$0")"
+PROJECT_ROOT="$(git rev-parse --show-toplevel)" || {
+    echo "Error: Not in a git repository" >&2
+    exit 1
+}
+readonly PROJECT_ROOT
+SHORT_NAME="$(grep -oP '(?<=^short_name = ")[^"]+' "${PROJECT_ROOT}/pyproject.toml"  | tr -d '\n')" || {
+    echo "Error: Could not extract short_name from pyproject.toml" >&2
+    exit 1
+}
+readonly SHORT_NAME
+PROJECT_VERSION="$(grep -oP '(?<=^version = ")[^"]+' "${PROJECT_ROOT}/pyproject.toml"  | tr -d '\n')" || {
+    echo "Error: Could not extract version from pyproject.toml" >&2
+    exit 1
+}
+readonly PROJECT_VERSION
+SCRIPT_NAME="$(basename "$0")" || {
+    echo "Error: Could not determine script name" >&2
+    exit 1
+}
+readonly SCRIPT_NAME
 readonly IMAGE="${MODEL_NAME}_v${MODEL_VERSION}"
-readonly BUILD_NUMBER=$(date +%Y%m%dT%H%M)
+BUILD_NUMBER="$(date +%Y%m%dT%H%M)" || {
+    echo "Error: Could not generate build number" >&2
+    exit 1
+}
+readonly BUILD_NUMBER
 readonly DOCKERFILE="${PROJECT_ROOT}/pipeline_app/Dockerfile"
 readonly CONTAINER_REGISTRY_NAMESPACE="aimodelserving"
 readonly ENV_FILE="${PROJECT_ROOT}/.env"
+readonly LOCAL_APP_RUNTIME_CONFIG_FILE="./pipeline_app/runtime-config.json"
+readonly LOCAL_APP_EXPORT_CONFIG_FILE="./pipeline_app/export-config.json"
+readonly LOCAL_APP_STATS_CONFIG_FILE="./pipeline_app/stats-config.json"
+SHORT_ENV="$(echo "${ENVIRONMENT:0:1}" | tr '[:upper:]' '[:lower:]')" || {
+    echo "Error: Could not determine short environment" >&2
+    exit 1
+}
+readonly SHORT_ENV
+readonly BASE_NAME="${SHORT_NAME}-${ENVIRONMENT}-${LOCATION}"
+readonly RG_NAME="rg-${BASE_NAME//_/-}"
+readonly ACI_NAME="acg-${SHORT_NAME}-ondemand-${SHORT_ENV}"
+APP_STORAGE_ACCOUNT_NAME="st${SHORT_NAME}primary${SHORT_ENV}"
+APP_STORAGE_ACCOUNT_NAME=$(echo "$APP_STORAGE_ACCOUNT_NAME" | tr '[:upper:]' '[:lower:]')
+APP_STORAGE_ACCOUNT_NAME="${APP_STORAGE_ACCOUNT_NAME//[^a-z0-9]/}"
+APP_STORAGE_ACCOUNT_NAME="${APP_STORAGE_ACCOUNT_NAME:0:24}"
+readonly APP_STORAGE_ACCOUNT_NAME
+readonly APP_RUNTIME_CONFIG_FILE="/mnt/azurefiles/config/runtime_config.json"
+readonly APP_EXPORT_CONFIG_FILE="/mnt/azurefiles/export-config.json"
+readonly APP_STATS_CONFIG_FILE="/mnt/azurefiles/stats-config.json"
 # Log levels
 readonly LOG_ERROR=0
 readonly LOG_INFO=1
@@ -611,6 +812,15 @@ case "$command" in
     publish_image)
         login_acr
         publish_image "$version"
+        exit 0
+        ;;
+    upload_pipeline_config)
+        upload_pipeline_config
+        exit 0
+        ;;
+    deploy_container_instance)
+        validate_deploy_container_instance_parameters "$@"
+        deploy_container_instance "$version"
         exit 0
         ;;
     *)

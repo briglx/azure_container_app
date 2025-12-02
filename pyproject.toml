@@ -1,6 +1,6 @@
 [project]
 name = "azure_container_app"
-version = "2025.11.1"
+version = "2025.12.1"
 license = { text = "MIT" }
 description = "A example project deploying containers"
 readme = "README.md"
@@ -20,4 +20,4 @@ application_owner = "briglx"
 [tool.codespell]
 count = ''
 quiet-level = 3
-skip = './.*,*.csv,*.json,*.pyc,./docs/_build/*,./htmlcov/*,*.workbook,*.egg-info,.artifact_cache'
+skip = './.*,*.csv,*.json,*.pyc,./docs/_build/*,./htmlcov/*,*.workbook,*.egg-info,.artifact_cache,*.drawio.svg'

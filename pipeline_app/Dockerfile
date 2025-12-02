@@ -1,6 +1,14 @@
 # FROM openjdk:21-slim-bullseye
 FROM mcr.microsoft.com/openjdk/jdk:21-ubuntu
 
+RUN echo 'alias ll='"'"'ls $LS_OPTIONS -al'"'"'' >> ~/.bashrc
+
+# Install dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        jq \
+        vim \
+    && rm -rf /var/lib/apt/lists/*
+
 ARG RELEASE_VERSION=0.0.0
 ARG APP_INSTALLER_FILE=installer.bin
 ARG APP_FILE=/opt/myapp/myapp
@@ -14,14 +22,6 @@ ENV RELEASE_VERSION=${RELEASE_VERSION} \
     APP_SETUP_ARGS=${APP_SETUP_ARGS} \
     APP_ALIAS=${APP_ALIAS} \
     DEBIAN_FRONTEND=noninteractive 
-
-RUN echo 'alias ll='"'"'ls $LS_OPTIONS -al'"'"'' >> ~/.bashrc
-
-# Install dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-        jq \
-        vim \
-    && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
 WORKDIR /app

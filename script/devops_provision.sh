@@ -168,6 +168,10 @@ az storage share create \
     --account-key "$APP_STORAGE_KEY" \
     --name share
 
+# Container Instance
+echo "Registering Container Instance resource provider" >&2
+az provider register --namespace Microsoft.ContainerInstance
+az provider show --namespace Microsoft.ContainerInstance --query "registrationState"
 
 # Create Event Grid
 echo "Creating Event Grid to trigger Function on new Blob creation" >&2

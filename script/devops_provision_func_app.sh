@@ -202,6 +202,6 @@ echo "Save output variables to ${env_file}" >&2
     echo "# Generated on ${isa_date_utc}"
     echo "FUNC_APP_NAME=$funcapp_name"
     echo "FUNC_NAME=event_grid_trigger"
-    echo "FUNC_KEY_MASTER=$func_key_master"
-    echo "FUNC_KEY=$func_key"
+    echo "FUNC_KEY_MASTER=\"$func_key_master\""
+    echo "FUNC_KEY=\"$func_key\""
 }>> "$env_file"

@@ -89,6 +89,12 @@ target_file="${ARTIFACT_FOLDER}/${ARTIFACT_NAME}"
     --account-key "$ARTIFACT_STORAGE_ACCOUNT_KEY" \
     --container-name "$ARTIFACT_CONTAINER" \
     --name "$target_file"
+
+# Or with defaults
+./script/devops.sh upload_artifact \
+    --file "$local_file" \
+    --account-name "$ARTIFACT_STORAGE_ACCOUNT" \
+    --account-key "$ARTIFACT_STORAGE_ACCOUNT_KEY"
 ```
 
 ## Build and Deploy the Artifact
@@ -108,12 +114,18 @@ target_file="${ARTIFACT_FOLDER}/${ARTIFACT_NAME}"
     --account-key "$ARTIFACT_STORAGE_ACCOUNT_KEY" \
     --container-name "$ARTIFACT_CONTAINER" \
     --name "$target_file"
+
+# Or with defaults
+./script/devops.sh fetch_artifact \
+    --account-name "$ARTIFACT_STORAGE_ACCOUNT" \
+    --account-key "$ARTIFACT_STORAGE_ACCOUNT_KEY"
 ```
 
 ### Build docker image
 ```bash
 ./script/devops.sh build_image \
-    --channel dev
+    --channel dev \
+    --debug
 ```
 
 ### Push image
@@ -123,58 +135,22 @@ target_file="${ARTIFACT_FOLDER}/${ARTIFACT_NAME}"
 # docker login -u "$CONTAINER_REGISTRY_USERNAME" -p "$CONTAINER_REGISTRY_PASSWORD" "${CONTAINER_REGISTRY_NAME}.azurecr.io"
 
 ./script/devops.sh publish_image \
-    --version "$IMAGE_VERSION"
+    --version "$IMAGE_VERSION" \
+    --debug
 ```
 
 ### Deploy Configs
 ```bash
 # Copy app configs to storage share
-config_files=(
-    "$LOCAL_APP_RUNTIME_CONFIG_FILE"
-    "$LOCAL_APP_EXPORT_CONFIG_FILE"
-    "$LOCAL_APP_STATS_CONFIG_FILE"
-)
-for config_file in "${config_files[@]}"; do
-    az storage file upload \
-        --source "$config_file" \
-        --share-name share \
-        --account-key "$APP_STORAGE_KEY" \
-        --account-name "$APP_STORAGE_ACCOUNT_NAME"
-done
-
-# Or via devops
 ./script/devops.sh upload_pipeline_config \
-
+    --debug
 ```
 
 ### Deploy to Azure Container Instance
 ```bash
-# Remove previous
-az container delete \
-    --resource-group "$ACI_RESOURCE_GROUP" \
-    --name "$ACI_NAME" \
-    --yes
-
-# Create new instance
-az container create \
-    --resource-group "$ACI_RESOURCE_GROUP" \
-    --name "$ACI_NAME" \
-    --image "${CONTAINER_REGISTRY_NAME}.azurecr.io/${CONTAINER_REGISTRY_NAMESPACE}/${image}:${version}" \
-    --cpu 2 --memory 4 \
-    --restart-policy Never \
-    --os-type Linux \
-    --registry-login-server "${CONTAINER_REGISTRY_NAME}.azurecr.io" \
-    --registry-username "$CONTAINER_REGISTRY_USERNAME" \
-    --registry-password "$CONTAINER_REGISTRY_PASSWORD" \
-    --azure-file-volume-account-name $APP_STORAGE_ACCOUNT_NAME \
-    --azure-file-volume-account-key $APP_STORAGE_KEY \
-    --azure-file-volume-share-name "share" \
-    --azure-file-volume-mount-path /mnt/azurefiles \
-    --environment-variables \
-        APP_RUNTIME_CONFIG_FILE="$APP_RUNTIME_CONFIG_FILE" \
-        APP_EXPORT_CONFIG_FILE="$APP_EXPORT_CONFIG_FILE" \
-        APP_STATS_CONFIG_FILE="$APP_STATS_CONFIG_FILE" \
-        APP_LOG_FILE="$APP_LOG_FILE"
+./script/devops.sh deploy_container_instance \
+    --version "$IMAGE_VERSION" \
+    --debug
 ```
 
 # Development
