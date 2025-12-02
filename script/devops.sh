@@ -672,7 +672,7 @@ SCRIPT_NAME="$(basename "$0")" || {
 }
 readonly SCRIPT_NAME
 readonly IMAGE="${MODEL_NAME}_v${MODEL_VERSION}"
-BUILD_NUMBER="$(date +%Y%m%dT%H%M)" || {
+BUILD_NUMBER="$(date -u +%Y%m%dT%H%MZ)" || {
     echo "Error: Could not generate build number" >&2
     exit 1
 }
