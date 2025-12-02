@@ -12,6 +12,15 @@ on:
                 description: "Build and Push Docker"
                 default: false
                 type: boolean
+            target:
+                description: "Environment to deploy to"
+                required: true
+                default: "dev"
+                type: choice
+                options:
+                  - production
+                  - staging
+                  - dev
 
 jobs:
     lint:
@@ -34,9 +43,16 @@ jobs:
               run: |
                 codespell "${{ github.workspace }}"
                 shellcheck -x ${{ github.workspace }}/script/*.sh
+
     build_and_push_docker_image:
         runs-on: ubuntu-latest
-        environment: dev
+        environment: ${{ inputs.target }}
+        env:
+          ENVIRONMENT: ${{ vars.ENVIRONMENT  }}
+          LOCATION: ${{ vars.LOCATION }}
+          MODEL_NAME: ${{ vars.MODEL_NAME }}
+          MODEL_VERSION: ${{ vars.MODEL_VERSION }}
+          KEY_VAULT_NAME: ${{ vars.KEY_VAULT_NAME }}
         if: |
           !failure() && !cancelled() &&
           (
@@ -46,78 +62,36 @@ jobs:
             - name: Check out code from GitHub
               uses: actions/checkout@v5
 
-            - name: Set common variables
-              id: set-env
+            - name: Fetch Artifact
               run: |
-                echo "Setting common environment variables"
-                project_root="${{ github.workspace }}"
-                project_name=$(cat "${project_root}/pyproject.toml" | grep -oP '(?<=^name = ")[^"]+' | tr -d '\n')
-                project_version=$(cat "${project_root}/pyproject.toml" | grep -oP '(?<=^version = ")[^"]+' | tr -d '\n')
-
-                echo "PROJECT_NAME=${project_name}" >> $GITHUB_ENV
-                echo "PROJECT_VERSION=${project_version}" >> $GITHUB_ENV
-
-            - name: Fetch Artifacts
-              run: |
-
-                ARTIFACT_SAS_TOKEN=$(az storage container generate-sas \
-                  --name "${{ vars.ARTIFACT_CONTAINER }}" \
-                  --auth-mode key \
-                  --account-key "${{ secrets.ARTIFACT_STORAGE_KEY }}" \
+                ./script/devops.sh fetch_artifact \
                   --account-name "${{ vars.ARTIFACT_STORAGE_ACCOUNT }}" \
-                  --permission r \
-                  --expiry $(date -u -d "5 minutes" '+%Y-%m-%dT%H:%MZ') \
-                  --output tsv 2>&1)
-                  
-                artifact_path="https://${{ vars.ARTIFACT_STORAGE_ACCOUNT }}.blob.core.windows.net/${{ vars.ARTIFACT_CONTAINER }}/${{ vars.ARTIFACT_FOLDER }}/${{ vars.ARTIFACT_NAME }}?${ARTIFACT_SAS_TOKEN}"
-                mkdir -p .artifact_cache
-                curl -fsSL "${artifact_path}" -o "${{ vars.ARTIFACT_NAME }}"
-                unzip -q "${{ vars.ARTIFACT_NAME }}" -d .artifact_cache
+                  --account-key "${{ secrets.ARTIFACT_STORAGE_KEY }}" \
 
             - name: Build docker image
               run: |
-                # Configure image version
-                model_name="${{ vars.MODEL_NAME }}"
-                model_version="${{ vars.MODEL_VERSION }}"
-                image="${model_name}_v${model_version}"
-
-                proj_version="${{ env.PROJECT_VERSION }}"
-                build_number=$(date +%Y%m%dT%H%M)
-                version="${proj_version}.dev${build_number}"
-
-                echo "IMAGE=${image}" >> $GITHUB_ENV
+                version=$(./script/devops.sh build_image \
+                  --channel dev)
+                
                 echo "IMAGE_VERSION=${version}" >> $GITHUB_ENV
+              env:
+                APP_INSTALLER_FILE: ${{ vars.APP_INSTALLER_FILE }}
+                APP_FILE: ${{ vars.APP_FILE }}
+                APP_SETUP_ARGS: ${{ vars.APP_SETUP_ARGS }}
+                APP_ALIAS: ${{ vars.APP_ALIAS }}
+                
 
-                image_name="${image}:${version}"
+            # - name: Login to Azure Container Registry
+            #   uses: docker/login-action@v3
+            #   with:
+            #     registry: ${{ vars.CONTAINER_REGISTRY_NAME }}.azurecr.io
+            #     username: ${{ vars.CONTAINER_REGISTRY_USERNAME }}
+            #     password: ${{ secrets.CONTAINER_REGISTRY_PASSWORD }}
 
-                project_root=$(git rev-parse --show-toplevel)
-                dockerfile_path="${project_root}/pipeline_app/Dockerfile"
-
-                # Build image
-                DOCKER_BUILDKIT=1 docker buildx build \
-                    --platform linux/amd64 \
-                    --build-arg "RELEASE_VERSION=$version" \
-                    --build-arg "APP_INSTALLER_FILE=${{ vars.APP_INSTALLER_FILE }}" \
-                    --build-arg "APP_FILE=${{ vars.APP_FILE }}" \
-                    --build-arg "APP_SETUP_ARGS=${{ vars.APP_SETUP_ARGS }}"  \
-                    --build-arg "APP_ALIAS=${{ vars.APP_ALIAS }}" \
-                    -t "$image_name" -f "${dockerfile_path}" "${project_root}"
-
-            - name: Login to Azure Container Registry
-              uses: docker/login-action@v3
-              with:
-                registry: ${{ vars.CONTAINER_REGISTRY_NAME }}.azurecr.io
-                username: ${{ vars.CONTAINER_REGISTRY_USERNAME }}
-                password: ${{ secrets.CONTAINER_REGISTRY_PASSWORD }}
-
-            - name: Push Image
+            - name: Publish Image
               run: |
-                # Tag image
-                image="${{ env.IMAGE }}"
                 version="${{ env.IMAGE_VERSION }}"
-                docker tag "${image}:${version}" "${image}:latest"
-                docker tag "${image}:${version}" "${{ vars.CONTAINER_REGISTRY_NAME }}.azurecr.io/${{ vars.CONTAINER_REGISTRY_NAMESPACE }}/${image}:${version}"
-                docker tag "${image}:latest" "${{ vars.CONTAINER_REGISTRY_NAME }}.azurecr.io/${{ vars.CONTAINER_REGISTRY_NAMESPACE }}/${image}:latest"
 
-                docker push "${{ vars.CONTAINER_REGISTRY_NAME }}.azurecr.io/${{ vars.CONTAINER_REGISTRY_NAMESPACE }}/${image}:${version}"
-                docker push "${{ vars.CONTAINER_REGISTRY_NAME }}.azurecr.io/${{ vars.CONTAINER_REGISTRY_NAMESPACE }}/${image}:latest"
+                ./script/devops.sh publish_image \
+                  --version "$version" \
+                  --channel dev

@@ -64,6 +64,7 @@ show_help() {
     echo ""
     echo "   publish_image Publish a Docker image to Azure Container Registry."
     echo "      -v, --version          Version tag for the Docker image."
+    echo "      -l, --channel          Release channel (dev or release). Default: $CHANNEL_DEV"
     echo ""
     echo "   upload_pipeline_config Upload pipeline configuration to Azure Blob Storage."
     ecoh ""
@@ -406,10 +407,14 @@ build_image(){
 
     log_info "Successfully built image: $image_name"
 
+    # Return version
+    echo "$version"
+
 }
 
 publish_image(){
     local version="$1"
+    local channel="$2"
     local dev_tags=("${version}" "dev")
     local release_tags=("${version}" "latest")
 
@@ -811,7 +816,7 @@ case "$command" in
         ;;
     publish_image)
         login_acr
-        publish_image "$version"
+        publish_image "$version" "$channel"
         exit 0
         ;;
     upload_pipeline_config)

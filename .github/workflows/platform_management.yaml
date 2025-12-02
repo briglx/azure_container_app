@@ -33,6 +33,37 @@ permissions:
   contents: read # This is required for actions/checkout
 
 jobs:
+  Provision_Shared_Resources:
+    name: Provision Shared Resources
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.target }}
+    env:
+      ENVIRONMENT: ${{ vars.ENVIRONMENT  }}
+      LOCATION: ${{ vars.LOCATION }}
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      SUBSCRIPTION_ID: ${{ secrets.SUBSCRIPTION_ID }}
+      
+    if: |
+      !failure() && !cancelled() &&
+      (
+        github.event.inputs.provisionShared == 'true'
+      )
+    steps:
+      - name: Check out code from GitHub
+        uses: actions/checkout@v5
+
+      - name: OIDC Login to Azure
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.CICD_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.SUBSCRIPTION_ID }}
+
+      - name: Create Resources
+        id: task-create-resources
+        run: |
+          ./script/devops_provision_shared.sh
+  
   Provision_Solution_Resources:
     name: Provision Solution Resources
     runs-on: ubuntu-latest
@@ -64,36 +95,12 @@ jobs:
         id: task-create-resources
         run: |
           ./script/devops_provision.sh
-  Provision_Shared_Resources:
-    name: Provision Shared Resources
-    runs-on: ubuntu-latest
-    environment: ${{ inputs.target }}
-    env:
-      ENVIRONMENT: ${{ vars.ENVIRONMENT  }}
-      LOCATION: ${{ vars.LOCATION }}
-      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-      SUBSCRIPTION_ID: ${{ secrets.SUBSCRIPTION_ID }}
-      
-    if: |
-      !failure() && !cancelled() &&
-      (
-        github.event.inputs.provisionShared == 'true'
-      )
-    steps:
-      - name: Check out code from GitHub
-        uses: actions/checkout@v5
+  
 
-      - name: OIDC Login to Azure
-        uses: azure/login@v2
-        with:
-          client-id: ${{ secrets.CICD_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.SUBSCRIPTION_ID }}
+  
 
-      - name: Create Resources
-        id: task-create-resources
-        run: |
-          ./script/devops_provision_shared.sh
+
+
   Deploy_Container_Instance:
     name: Deploy Container Instance
     runs-on: ubuntu-latest
