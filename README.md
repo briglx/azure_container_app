@@ -123,9 +123,9 @@ target_file="${ARTIFACT_FOLDER}/${ARTIFACT_NAME}"
 
 ### Build docker image
 ```bash
-./script/devops.sh build_image \
+version=$(./script/devops.sh build_image \
     --channel dev \
-    --debug
+    --debug)
 ```
 
 ### Push image
@@ -133,6 +133,7 @@ target_file="${ARTIFACT_FOLDER}/${ARTIFACT_NAME}"
 ```bash
 # Login to remote registry
 # docker login -u "$CONTAINER_REGISTRY_USERNAME" -p "$CONTAINER_REGISTRY_PASSWORD" "${CONTAINER_REGISTRY_NAME}.azurecr.io"
+
 
 ./script/devops.sh publish_image \
     --version "$IMAGE_VERSION" \

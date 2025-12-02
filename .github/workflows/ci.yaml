@@ -21,6 +21,9 @@ on:
                   - production
                   - staging
                   - dev
+permissions:
+  id-token: write # This is required for requesting the JWT
+  contents: read # This is required for actions/checkout
 
 jobs:
     lint:
@@ -61,6 +64,13 @@ jobs:
         steps:
             - name: Check out code from GitHub
               uses: actions/checkout@v5
+
+            - name: OIDC Login to Azure
+              uses: azure/login@v2
+              with:
+                client-id: ${{ secrets.CICD_CLIENT_ID }}
+                tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+                subscription-id: ${{ secrets.SUBSCRIPTION_ID }}
 
             - name: Fetch Artifact
               run: |
