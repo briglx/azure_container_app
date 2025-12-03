@@ -488,7 +488,7 @@ resource_token=$(echo -n "${SUBSCRIPTION_ID}${project_name}${LOCATION}" | sha1su
 short_env=$(echo "${ENVIRONMENT:0:1}" | tr '[:upper:]' '[:lower:]')
 tags="asn=$application_service_number project=$project_name owner=$application_owner environment=$ENVIRONMENT"
 
-run_date=$(date +%Y%m%dT%H%M%S)
+run_date=$(date -u +%Y%m%dT%H%M%SZ)
 isa_date_utc=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
 deployment_name="${project_name}.Provisioning-Shared.${run_date}"
 

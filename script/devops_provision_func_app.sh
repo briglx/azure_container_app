@@ -159,7 +159,7 @@ az functionapp config appsettings set \
 echo "Deploying Function App Code"
 source_folder="${project_root}/functions"
 destination_dir="${project_root}/.dist"
-timestamp=$(date +'%Y%m%d%H%M%S')
+timestamp=$(date -u +'%Y%m%d%H%M%SZ')
 zip_file_name="${short_name}_functions_${ENVIRONMENT}_${timestamp}.zip"
 zip_file_path="${destination_dir}/${zip_file_name}"
 

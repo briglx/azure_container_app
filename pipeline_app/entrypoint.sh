@@ -3,7 +3,7 @@
 # Enable strict mode.
 set -euo pipefail
 
-build_number=$(date +%Y%m%dT%H%M)
+build_number=$(date -u +%Y%m%dT%H%MZ)
 
 format_print () {
     echo "$(date -uIns) | entrypoint | $1"
@@ -39,9 +39,10 @@ format_print ""
 
 format_print "Watch log file..."
 tail -n 0 -f "$APP_LOG_FILE" | tee -a "/mnt/azurefiles/log_${build_number}.log" >&2 &
+format_print "Log file watcher started."
 sleep 5
 
-# format_print "Build runtime args..."
+format_print "Build runtime args..."
 APP_RUNTIME_ARGS_STRING=$(./build_args.sh "$APP_RUNTIME_CONFIG_FILE")
 RUNTIME_ARGS_WITH_FILENAME="${APP_RUNTIME_ARGS_STRING//__OUTPUT__/output_${build_number}.acgd}"
 

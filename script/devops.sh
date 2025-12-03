@@ -14,7 +14,7 @@
 set -e
 
 get_timestamp() {
-    date '+%Y-%m-%d %H:%M:%S'
+    date -u '+%Y-%m-%d %H:%M:%SZ'
 }
 
 log_info() {

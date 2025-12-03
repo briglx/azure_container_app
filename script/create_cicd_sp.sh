@@ -107,7 +107,7 @@ project_name=$(grep -oP '(?<=^name = ")[^"]+' "${project_root}/pyproject.toml"  
 project_short_name=$(grep -oP '(?<=^short_name = ")[^"]+' "${project_root}/pyproject.toml"  | tr -d '\n')
 short_env=$(echo "${ENVIRONMENT:0:1}" | tr '[:upper:]' '[:lower:]')
 
-run_date=$(date +%Y%m%dT%H%M%S)
+run_date=$(date -u +%Y%m%dT%H%M%SZ)
 isa_date_utc=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
 deployment_name="${project_name}.Create-CICD-SP.${run_date}"
 

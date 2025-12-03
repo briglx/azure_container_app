@@ -23,6 +23,6 @@ resource_token=$(echo -n "${NAME_UPPER}${VER_UPPER}" | sha1sum | awk '{print $1}
 
 echo "Resource token: ${resource_token}" >&2
 
-run_date=$(date +%Y%m%d)
+run_date=$(date -u +%Y%m%dZ)
 
 echo "APP${run_date}${resource_token}"

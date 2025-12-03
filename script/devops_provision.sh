@@ -288,7 +288,7 @@ az eventgrid system-topic event-subscription create \
     --included-event-types Microsoft.Storage.BlobCreated
 
 # # Test
-# timestamp=$(date +'%Y%m%d%H%M%S')
+# timestamp=$(date -u +'%Y%m%d%H%M%SZ')
 # test_file="test_$timestamp"
 # touch "$test_file"
 # az storage blob upload \
