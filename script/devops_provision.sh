@@ -241,7 +241,6 @@ fi
 #     --endpoint-type webhook \
 #     --included-event-types Microsoft.Storage.BlobCreated
 
-
 # echo "Waiting for Function App to be ready..."
 # while true; do
 #     state=$(az functionapp show \

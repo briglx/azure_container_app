@@ -97,7 +97,7 @@ target_file="${ARTIFACT_FOLDER}/${ARTIFACT_NAME}"
     --account-key "$ARTIFACT_STORAGE_ACCOUNT_KEY"
 ```
 
-## Build and Deploy the Artifact
+## Build and Deploy the Pipeline App
 
 The build pipeline
 * Fetch artifact
@@ -150,6 +150,13 @@ version=$(./script/devops.sh build_image \
     --tag "$IMAGE_TAG" \
     --debug
 ```
+
+## Build and Deploy the Function App
+```bash
+./script/devops.sh deploy_function_app \
+    --debug
+```
+
 
 # Development
 

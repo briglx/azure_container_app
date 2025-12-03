@@ -71,6 +71,8 @@ show_help() {
     echo "   deploy_container_instance Deploy the Docker image to Azure Container Instances."
     echo "      -t, --tag               Docker image tag. Specific version of the image."
     echo ""
+    echo "   deploy_function_app Deploy the application to Azure Function App."
+    echo ""
     echo "Example usage:"
     echo "  $0 upload_artifact -a mystorageaccount -k myaccountkey -c mycontainer -f ./local/artifact.zip -n myfolder/myartifact.zip"
     echo "  $0 fetch_artifact -a mystorageaccount -k myaccountkey -c mycontainer -n myfolder/myartifact.zip"
@@ -78,6 +80,7 @@ show_help() {
     echo "  $0 publish_image -v 1.0.0"
     echo "  $0 upload_pipeline_config"
     echo "  $0 deploy_container_instance -v 1.0.0"
+    echo "  $0 deploy_function_app"
 }
 
 validate_parameters(){
@@ -182,7 +185,6 @@ validate_deploy_container_instance_parameters(){
     fi
 
 }
-
 
 upload_artifact(){
     local local_file="$1"
@@ -629,6 +631,57 @@ deploy_container_instance(){
 
 }
 
+deploy_function_app(){
+    log_info "Deploying Function App"
+
+    local funcapp_name="func-${SHORT_NAME}-${SHORT_ENV}-${RESOURCE_TOKEN}"
+    local funcapp_name="${funcapp_name:0:24}"
+
+    local source_folder="${PROJECT_ROOT}/functions"
+    local destination_dir="${PROJECT_ROOT}/.dist"
+    local zip_file_name="${SHORT_NAME}_functions_${ENVIRONMENT}_${BUILD_NUMBER}.zip"
+    local zip_file_path="${destination_dir}/${zip_file_name}"
+    
+    # Create the destination directory if it doesn't exist
+    mkdir -p "$(dirname "$zip_file_path")"
+
+    # Navigate to the source folder and create the zip file
+    log_info "Creating zip package from source folder: $source_folder"
+    pushd "$source_folder"
+
+    log_info "Zipping function app files into $zip_file_path"
+    zip -r "$zip_file_path" ./*.py host.json requirements.txt
+
+    log_info "Deploying zip package to Function App: $funcapp_name at resource group: $RG_NAME"
+    set +e
+    result=$(az functionapp deployment source config-zip \
+        --src "$zip_file_path" \
+        --name "$funcapp_name" \
+        --resource-group "$RG_NAME" \
+        --build-remote true \
+        --timeout 120 \
+        --only-show-errors 2>&1)
+    set -e
+
+    popd
+    
+    # Save file if LOG_DEBUG is enabled
+    if [[ $log_level -ge $LOG_DEBUG ]]; then
+        log_debug "Saving result to az_functionapp_deployment_source_config_zip.json."
+        echo "$result" >> "${PROJECT_ROOT}/.deploy_log/az_functionapp_deployment_source_config_zip.json"
+    fi
+
+    # Check for errors in the result
+    if grep -q "ERROR" <<< "$result"; then
+        log_error "${command^} failed due to an error."
+        log_error "$result"
+        exit 1
+    fi
+
+    log_info "Successfully deployed Function App"
+
+}
+
 #########################################################################
 # ENVIRONMENT VARIABLES (external, may be set by user)
 # - ALL_CAPS with underscores
@@ -644,6 +697,7 @@ KEY_VAULT_NAME="${KEY_VAULT_NAME:-}"
 ENVIRONMENT="${ENVIRONMENT:-dev}"
 LOCATION="${LOCATION:-westus3}"
 APP_LOG_FILE="${APP_LOG_FILE:-}"
+SUBSCRIPTION_ID="${SUBSCRIPTION_ID:-}"
 
 #########################################################################
 # SCRIPT CONSTANTS (internal, read-only)
@@ -661,6 +715,11 @@ SHORT_NAME="$(grep -oP '(?<=^short_name = ")[^"]+' "${PROJECT_ROOT}/pyproject.to
     exit 1
 }
 readonly SHORT_NAME
+PROJECT_NAME="$(grep -oP '(?<=^name = ")[^"]+' "${PROJECT_ROOT}/pyproject.toml"  | tr -d '\n')" || {
+    echo "Error: Could not extract name from pyproject.toml" >&2
+    exit 1
+}
+readonly PROJECT_NAME
 PROJECT_VERSION="$(grep -oP '(?<=^version = ")[^"]+' "${PROJECT_ROOT}/pyproject.toml"  | tr -d '\n')" || {
     echo "Error: Could not extract version from pyproject.toml" >&2
     exit 1
@@ -699,6 +758,8 @@ readonly APP_STORAGE_ACCOUNT_NAME
 readonly APP_RUNTIME_CONFIG_FILE="/mnt/azurefiles/runtime-config.json"
 readonly APP_EXPORT_CONFIG_FILE="/mnt/azurefiles/export-config.json"
 readonly APP_STATS_CONFIG_FILE="/mnt/azurefiles/stats-config.json"
+RESOURCE_TOKEN=$(echo -n "${SUBSCRIPTION_ID}${PROJECT_NAME}${LOCATION}" | sha1sum | awk '{print $1}' | cut -c1-8)
+readonly RESOURCE_TOKEN
 # Log levels
 readonly LOG_ERROR=0
 readonly LOG_INFO=1
@@ -826,6 +887,10 @@ case "$command" in
     deploy_container_instance)
         validate_deploy_container_instance_parameters "$@"
         deploy_container_instance "$tag"
+        exit 0
+        ;;
+    deploy_function_app)
+        deploy_function_app
         exit 0
         ;;
     *)
