@@ -696,7 +696,7 @@ APP_STORAGE_ACCOUNT_NAME=$(echo "$APP_STORAGE_ACCOUNT_NAME" | tr '[:upper:]' '[:
 APP_STORAGE_ACCOUNT_NAME="${APP_STORAGE_ACCOUNT_NAME//[^a-z0-9]/}"
 APP_STORAGE_ACCOUNT_NAME="${APP_STORAGE_ACCOUNT_NAME:0:24}"
 readonly APP_STORAGE_ACCOUNT_NAME
-readonly APP_RUNTIME_CONFIG_FILE="/mnt/azurefiles/config/runtime_config.json"
+readonly APP_RUNTIME_CONFIG_FILE="/mnt/azurefiles/runtime_config.json"
 readonly APP_EXPORT_CONFIG_FILE="/mnt/azurefiles/export-config.json"
 readonly APP_STATS_CONFIG_FILE="/mnt/azurefiles/stats-config.json"
 # Log levels

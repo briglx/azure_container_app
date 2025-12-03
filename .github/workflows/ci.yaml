@@ -17,7 +17,7 @@ on:
                 type: boolean
                 required: false
             image_tag:
-                description: "Docker Image Tag. A specific version/build of the image."
+                description: "Deploy Container Instance - Image Tag. A specific version/build of the image."
                 type: string
                 required: false
             target:
