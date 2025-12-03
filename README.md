@@ -133,7 +133,7 @@ version=$(./script/devops.sh build_image \
 # Login to remote registry
 # docker login -u "$CONTAINER_REGISTRY_USERNAME" -p "$CONTAINER_REGISTRY_PASSWORD" "${CONTAINER_REGISTRY_NAME}.azurecr.io"
 ./script/devops.sh publish_image \
-    --version "$IMAGE_VERSION" \
+    --tag "$IMAGE_TAG" \
     --debug
 ```
 
@@ -147,7 +147,7 @@ version=$(./script/devops.sh build_image \
 ### Deploy to Azure Container Instance
 ```bash
 ./script/devops.sh deploy_container_instance \
-    --version "$IMAGE_VERSION" \
+    --tag "$IMAGE_TAG" \
     --debug
 ```
 

@@ -46,30 +46,30 @@ show_help() {
     echo "Commands"
     echo ""
     echo "  upload_artifact Upload an artifact to Azure Blob Storage."
-    echo "      -a, --account-name     Storage account name"
-    echo "      -k, --account-key      Storage account key"
-    echo "      -c, --container-name   (Optional) Blob container name. Default: $DEFAULT_ARTIFACT_CONTAINER"
-    echo "      -f, --file             Local file path to upload"
-    echo "      -n, --name             (Optional) Target name in blob storage. Default: ${SHORT_NAME}/artifact.zip"
+    echo "      -a, --account-name      Storage account name"
+    echo "      -k, --account-key       Storage account key"
+    echo "      -c, --container-name    (Optional) Blob container name. Default: $DEFAULT_ARTIFACT_CONTAINER"
+    echo "      -f, --file              Local file path to upload"
+    echo "      -n, --name              (Optional) Target name in blob storage. Default: ${SHORT_NAME}/artifact.zip"
     echo ""
     echo "  fetch_artifact Fetch an artifact from Azure Blob Storage."
-    echo "      -a, --account-name     Storage account name"
-    echo "      -k, --account-key      Storage account key"
-    echo "      -c, --container-name   (Optional) Blob container name. Default: $DEFAULT_ARTIFACT_CONTAINER"
-    echo "      -n, --name             (Optional) Target name in blob storage. Default: ${SHORT_NAME}/artifact.zip"
+    echo "      -a, --account-name      Storage account name"
+    echo "      -k, --account-key       Storage account key"
+    echo "      -c, --container-name    (Optional) Blob container name. Default: $DEFAULT_ARTIFACT_CONTAINER"
+    echo "      -n, --name              (Optional) Target name in blob storage. Default: ${SHORT_NAME}/artifact.zip"
     echo ""
     echo "   build_image Build a Docker image for the application."
-    echo "      -n, --name             Name of the Docker image to build."
-    echo "      -l, --channel          Release channel (dev or release). Default: $CHANNEL_DEV"
+    echo "      -n, --name              Name of the Docker image to build."
+    echo "      -l, --channel           Release channel (dev or release). Default: $CHANNEL_DEV"
     echo ""
     echo "   publish_image Publish a Docker image to Azure Container Registry."
-    echo "      -v, --version          Version tag for the Docker image."
-    echo "      -l, --channel          Release channel (dev or release). Default: $CHANNEL_DEV"
+    echo "      -t, --tag               Docker image tag. Specific version of the image."
+    echo "      -l, --channel           Release channel (dev or release). Default: $CHANNEL_DEV"
     echo ""
     echo "   upload_pipeline_config Upload pipeline configuration to Azure Blob Storage."
     ecoh ""
     echo "   deploy_container_instance Deploy the Docker image to Azure Container Instances."
-    echo "      -v, --version          Version tag for the Docker image."
+    echo "      -t, --tag               Docker image tag. Specific version of the image."
     echo ""
     echo "Example usage:"
     echo "  $0 upload_artifact -a mystorageaccount -k myaccountkey -c mycontainer -f ./local/artifact.zip -n myfolder/myartifact.zip"
@@ -174,9 +174,9 @@ validate_build_image_parameters(){
 
 validate_deploy_container_instance_parameters(){
 
-    if [ -z "$version" ]
+    if [ -z "$tag" ]
     then
-        log_error "usage error: --version is required." >&2
+        log_error "usage error: --tag is required." >&2
         show_help
         exit 1
     fi
@@ -375,19 +375,19 @@ build_image(){
 
     # Determine build version
     if [ "$channel" == "$CHANNEL_RELEASE" ]; then
-        version="${PROJECT_VERSION}"
+        tag="${PROJECT_VERSION}"
     else
-        version="${PROJECT_VERSION}.dev${BUILD_NUMBER}"
+        tag="${PROJECT_VERSION}.dev${BUILD_NUMBER}"
     fi
 
-    image_name="${IMAGE}:${version}"
+    image_name="${IMAGE}:${tag}"
 
     log_debug "Building image: $image_name for dockerfile_path: $DOCKERFILE."
 
     # Build image
     DOCKER_BUILDKIT=1 docker buildx build \
         --platform linux/amd64 \
-        --build-arg "RELEASE_VERSION=$version" \
+        --build-arg "RELEASE_VERSION=$tag" \
         --build-arg "APP_INSTALLER_FILE=$APP_INSTALLER_FILE" \
         --build-arg "APP_FILE=$APP_FILE" \
         --build-arg "APP_SETUP_ARGS=$APP_SETUP_ARGS"  \
@@ -395,28 +395,28 @@ build_image(){
         -t "$image_name" -f "${DOCKERFILE}" "${PROJECT_ROOT}"
 
 
-    # Record build version
+    # Record build tag
     # Get the output variables from the deployment
     log_info "Save output variables to ${ENV_FILE}"
     {
         echo ""
         echo "# Script $SCRIPT_NAME - build_image - output variables."
         echo "# Generated on ${ISO_DATE_UTC}"
-        echo "IMAGE_VERSION=${version}"
+        echo "IMAGE_TAG=${tag}"
     }>> "$ENV_FILE"
 
     log_info "Successfully built image: $image_name"
 
-    # Return version
-    echo "$version"
+    # Return image_tag
+    echo "$tag"
 
 }
 
 publish_image(){
-    local version="$1"
+    local image_tag="$1"
     local channel="$2"
-    local dev_tags=("${version}" "dev")
-    local release_tags=("${version}" "latest")
+    local dev_tags=("${image_tag}" "dev")
+    local release_tags=("${image_tag}" "latest")
 
     if [ "$channel" == "$CHANNEL_RELEASE" ]
     then
@@ -427,7 +427,7 @@ publish_image(){
 
     # Tag images with extra tags
     for tag in "${tags[@]}"; do
-        docker tag "${IMAGE}:${version}" "${IMAGE}:${tag}"
+        docker tag "${IMAGE}:${image_tag}" "${IMAGE}:${tag}"
     done
 
     if ! registry_name=$(get_keyvault_secret "$KEY_VAULT_NAME" "SharedContainerRegistryName"); then
@@ -509,13 +509,13 @@ upload_pipeline_config(){
 }
 
 deploy_container_instance(){
-    local version="$1"
+    local image_tag="$1"
     local registry_name
     local registry_username
     local registry_password
     local app_storage_key
 
-    log_info "Deploying container instance for image version: $version"
+    log_info "Deploying container instance for image tag: $image_tag"
 
     # Delete existing container instance if it exists
     log_info "Checking for existing container instance: ${ACI_NAME} in resource group: ${RG_NAME}."
@@ -577,7 +577,7 @@ deploy_container_instance(){
     result=$(az container create \
         --resource-group "$RG_NAME" \
         --name "$ACI_NAME" \
-        --image "${registry_name}.azurecr.io/${CONTAINER_REGISTRY_NAMESPACE}/${IMAGE}:${version}" \
+        --image "${registry_name}.azurecr.io/${CONTAINER_REGISTRY_NAMESPACE}/${IMAGE}:${image_tag}" \
         --cpu 2 --memory 4 \
         --restart-policy Never \
         --os-type Linux \
@@ -625,7 +625,7 @@ deploy_container_instance(){
         exit 1
     fi
 
-    log_info "Successfully deployed container instance for image version: $version"
+    log_info "Successfully deployed container instance for image tag: $image_tag"
 
 }
 
@@ -715,8 +715,8 @@ readonly NC='\033[0m'
 readonly DEFAULT_ARTIFACT_NAME="${SHORT_NAME}/artifact.zip"
 readonly DEFAULT_ARTIFACT_CONTAINER=shared-artifacts
 # Command-line options
-readonly LONGOPTS=account-name:,account-key:,channel:,container-name:,file:,name:,version:,debug,help
-readonly OPTIONS=a:k:l:c:f:n:v:dh
+readonly LONGOPTS=account-name:,account-key:,channel:,container-name:,file:,name:,tag:,debug,help
+readonly OPTIONS=a:k:l:c:f:n:t:dh
 
 #########################################################################
 # SCRIPT GLOBAL VARIABLES (internal, mutable)
@@ -731,7 +731,7 @@ container_name=""
 file=""
 log_level="$LOG_INFO"
 name=""
-version=""
+tag=""
 
 log_info "Starting $SCRIPT_NAME"
 
@@ -776,8 +776,8 @@ while true; do
             show_help
             exit
             ;;
-        -v|--version)
-            version="$2"
+        -t|--image_tag)
+            tag="$2"
             shift 2
             ;;
         --)
@@ -816,7 +816,7 @@ case "$command" in
         ;;
     publish_image)
         login_acr
-        publish_image "$version" "$channel"
+        publish_image "$tag" "$channel"
         exit 0
         ;;
     upload_pipeline_config)
@@ -825,7 +825,7 @@ case "$command" in
         ;;
     deploy_container_instance)
         validate_deploy_container_instance_parameters "$@"
-        deploy_container_instance "$version"
+        deploy_container_instance "$tag"
         exit 0
         ;;
     *)

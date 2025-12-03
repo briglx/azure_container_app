@@ -16,8 +16,8 @@ on:
                 description: "Deploy Container Instance"
                 type: boolean
                 required: false
-            image_version:
-                description: "Docker Image Version to deploy"
+            image_tag:
+                description: "Docker Image Tag. A specific version/build of the image."
                 type: string
                 required: false
             target:
@@ -66,7 +66,7 @@ jobs:
         runs-on: ubuntu-latest
         environment: ${{ inputs.target }}
         outputs:
-          image_version: ${{ steps.build-docker-image.outputs.image_version }}
+          image_tag: ${{ steps.build-docker-image.outputs.image_tag }}
         if: |
           !failure() && !cancelled() &&
           (
@@ -92,11 +92,11 @@ jobs:
             - name: Build docker image
               id: build-docker-image
               run: |
-                version=$(./script/devops.sh build_image \
+                image_tag=$(./script/devops.sh build_image \
                   --channel dev)
                 
-                echo "IMAGE_VERSION=${version}" >> $GITHUB_ENV
-                echo "image_version=${version}" >> $GITHUB_OUTPUT
+                echo "IMAGE_TAG=${image_tag}" >> $GITHUB_ENV
+                echo "image_tag=${image_tag}" >> $GITHUB_OUTPUT
               env:
                 APP_INSTALLER_FILE: ${{ vars.APP_INSTALLER_FILE }}
                 APP_FILE: ${{ vars.APP_FILE }}
@@ -105,10 +105,10 @@ jobs:
 
             - name: Publish Image
               run: |
-                version="${{ env.IMAGE_VERSION }}"
+                image_tag="${{ env.IMAGE_TAG }}"
 
                 ./script/devops.sh publish_image \
-                  --version "$version" \
+                  --tag "$image_tag" \
                   --channel dev
     
     deploy_container_instance:
@@ -135,6 +135,6 @@ jobs:
             id: task-deploy-container
             run: |
               ./script/devops.sh deploy_container_instance \
-                --version "${{ github.event.inputs.image_version }}"
+                --tag "${{ github.event.inputs.image_tag }}"
             env:
                 APP_LOG_FILE: ${{ vars.APP_LOG_FILE }}
