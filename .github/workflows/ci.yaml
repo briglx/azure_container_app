@@ -63,14 +63,17 @@ jobs:
                 shellcheck -x ${{ github.workspace }}/script/*.sh
 
     build_and_push_docker_image:
+        needs: lint
         runs-on: ubuntu-latest
         environment: ${{ inputs.target }}
         outputs:
-          image_tag: ${{ steps.build-docker-image.outputs.image_tag }}
+          build_tag: ${{ steps.build-docker-image.outputs.build_tag }}
         if: |
           !failure() && !cancelled() &&
           (
-            github.event.inputs.build_and_push == 'true'
+            (github.event_name != 'workflow_dispatch' && github.event.inputs.build_and_push == 'true')
+           || 
+            (github.event_name == 'push')
           )
         steps:
             - name: Check out code from GitHub
@@ -92,11 +95,11 @@ jobs:
             - name: Build docker image
               id: build-docker-image
               run: |
-                image_tag=$(./script/devops.sh build_image \
+                build_tag=$(./script/devops.sh build_image \
                   --channel dev)
                 
-                echo "IMAGE_TAG=${image_tag}" >> $GITHUB_ENV
-                echo "image_tag=${image_tag}" >> $GITHUB_OUTPUT
+                echo "BUILD_TAG=${build_tag}" >> $GITHUB_ENV
+                echo "build_tag=${build_tag}" >> $GITHUB_OUTPUT
               env:
                 APP_INSTALLER_FILE: ${{ vars.APP_INSTALLER_FILE }}
                 APP_FILE: ${{ vars.APP_FILE }}
@@ -105,20 +108,23 @@ jobs:
 
             - name: Publish Image
               run: |
-                image_tag="${{ env.IMAGE_TAG }}"
+                build_tag="${{ env.BUILD_TAG }}"
 
                 ./script/devops.sh publish_image \
-                  --tag "$image_tag" \
+                  --tag "$build_tag" \
                   --channel dev
     
     deploy_container_instance:
         name: Deploy Container Instance
+        needs: build_and_push_docker_image
         runs-on: ubuntu-latest
         environment: ${{ inputs.target }}
         if : |
           !failure() && !cancelled() && 
           (
-            github.event.inputs.deploy_container == 'true'
+            (github.event_name != 'workflow_dispatch' && github.event.inputs.deploy_container == 'true')
+           || 
+            (github.event_name == 'push')
           )
         steps:
           - name: Check out code from GitHub
@@ -135,6 +141,6 @@ jobs:
             id: task-deploy-container
             run: |
               ./script/devops.sh deploy_container_instance \
-                --tag "${{ github.event.inputs.image_tag }}"
+                --tag "${{ github.event_name == 'workflow_dispatch' && github.event.inputs.image_tag || needs.build_and_push_docker_image.outputs.build_tag }}"
             env:
                 APP_LOG_FILE: ${{ vars.APP_LOG_FILE }}
