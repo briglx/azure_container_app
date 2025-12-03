@@ -23,7 +23,7 @@ on:
             target:
                 description: "Environment to deploy to"
                 required: true
-                default: "dev"
+                default: "staging"
                 type: choice
                 options:
                   - production
@@ -41,6 +41,43 @@ env:
   KEY_VAULT_NAME: ${{ vars.KEY_VAULT_NAME }}
 
 jobs:
+    init:
+      name: Initialize build
+      runs-on: ubuntu-latest
+      outputs:
+        channel: ${{ steps.version.outputs.channel }}
+      steps:
+        - shell: bash
+          id: version
+          env:
+            EVENT_NAME: ${{ github.event_name }}
+            REF_NAME: ${{ github.ref_name }}
+            WORKFLOW_TARGET: ${{ github.event.inputs.target }}
+          run: |
+
+            if [[ "$EVENT_NAME" == "workflow_dispatch" && -n "$WORKFLOW_TARGET" ]]; then
+              TARGET="$WORKFLOW_TARGET"
+              echo "Using workflow dispatch target: $TARGET"
+            else
+              # Set environment based on branch
+              case "$REF_NAME" in
+                main|master)
+                  TARGET="production"
+                  ;;
+                staging)
+                  TARGET="staging"
+                  ;;
+                develop)
+                  TARGET="dev"
+                  ;;
+                *)
+                  TARGET="dev"
+                  ;;
+              esac
+              echo "Detected branch: $REF_NAME, setting target: $TARGET"
+            fi
+            
+            echo "channel=staging" >> $GITHUB_OUTPUT
     lint:
         runs-on: ubuntu-latest
         steps:
@@ -63,9 +100,9 @@ jobs:
                 shellcheck -x ${{ github.workspace }}/script/*.sh
 
     build_and_push_docker_image:
-        needs: lint
+        needs: [init, lint]
         runs-on: ubuntu-latest
-        environment: ${{ inputs.target }}
+        environment: ${{ needs.init.outputs.channel }}
         outputs:
           build_tag: ${{ steps.build-docker-image.outputs.build_tag }}
         if: |
@@ -116,9 +153,9 @@ jobs:
     
     deploy_container_instance:
         name: Deploy Container Instance
-        needs: build_and_push_docker_image
+        needs: [init, build_and_push_docker_image]
         runs-on: ubuntu-latest
-        environment: ${{ inputs.target }}
+        environment: ${{ needs.init.outputs.channel }}
         if : |
           !failure() && !cancelled() && 
           (
