@@ -67,7 +67,7 @@ show_help() {
     echo "      -l, --channel           Release channel (dev or release). Default: $CHANNEL_DEV"
     echo ""
     echo "   upload_pipeline_config Upload pipeline configuration to Azure Blob Storage."
-    ecoh ""
+    echo ""
     echo "   deploy_container_instance Deploy the Docker image to Azure Container Instances."
     echo "      -t, --tag               Docker image tag. Specific version of the image."
     echo ""
@@ -776,7 +776,7 @@ while true; do
             show_help
             exit
             ;;
-        -t|--image_tag)
+        -t|--tag)
             tag="$2"
             shift 2
             ;;
