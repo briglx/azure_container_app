@@ -20,6 +20,10 @@ on:
                 description: "Deploy Container Instance - Image Tag. A specific version/build of the image."
                 type: string
                 required: false
+            deploy_function:
+                description: "Deploy Function App"
+                type: boolean
+                required: false
             target:
                 description: "Environment to deploy to"
                 required: true
@@ -181,3 +185,32 @@ jobs:
                 --tag "${{ github.event_name == 'workflow_dispatch' && github.event.inputs.image_tag || needs.build_and_push_docker_image.outputs.build_tag }}"
             env:
                 APP_LOG_FILE: ${{ vars.APP_LOG_FILE }}
+    deploy_function_app:
+        name: Deploy Function App
+        needs: [init]
+        runs-on: ubuntu-latest
+        environment: ${{ needs.init.outputs.channel }}
+        if : |
+          !failure() && !cancelled() && 
+          (
+            (github.event_name != 'workflow_dispatch' && github.event.inputs.deploy_function == 'true')
+           || 
+            (github.event_name == 'push')
+          )
+        steps:
+          - name: Check out code from GitHub
+            uses: actions/checkout@v5
+
+          - name: OIDC Login to Azure
+            uses: azure/login@v2
+            with:
+              client-id: ${{ secrets.CICD_CLIENT_ID }}
+              tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+              subscription-id: ${{ secrets.SUBSCRIPTION_ID }}
+
+          - name: Deploy Function App
+            id: task-deploy-function
+            run: |
+              ./script/devops.sh deploy_function_app
+            env:
+                SUBSCRIPTION_ID: ${{ secrets.SUBSCRIPTION_ID }}
