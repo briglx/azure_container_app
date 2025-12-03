@@ -595,6 +595,7 @@ deploy_container_instance(){
             APP_EXPORT_CONFIG_FILE="$APP_EXPORT_CONFIG_FILE" \
             APP_STATS_CONFIG_FILE="$APP_STATS_CONFIG_FILE" \
             APP_LOG_FILE="$APP_LOG_FILE" \
+        --tags "${TAGS[@]}" \
         --only-show-errors 2>&1)
     set -e
 
@@ -660,6 +661,7 @@ deploy_function_app(){
         --resource-group "$RG_NAME" \
         --build-remote true \
         --timeout 120 \
+        --tags "${TAGS[@]}" \
         --only-show-errors 2>&1)
     set -e
 
@@ -760,6 +762,16 @@ readonly APP_EXPORT_CONFIG_FILE="/mnt/azurefiles/export-config.json"
 readonly APP_STATS_CONFIG_FILE="/mnt/azurefiles/stats-config.json"
 RESOURCE_TOKEN=$(echo -n "${SUBSCRIPTION_ID}${PROJECT_NAME}${LOCATION}" | sha1sum | awk '{print $1}' | cut -c1-8)
 readonly RESOURCE_TOKEN
+TAGS=(
+    "asn=tbd"
+    "project=$PROJECT_NAME"
+    "owner=tbd"
+    "environment=$ENVIRONMENT"
+    "servicetier=tier3"
+    "version=$PROJECT_VERSION"
+    "build=$BUILD_NUMBER"
+)
+
 # Log levels
 readonly LOG_ERROR=0
 readonly LOG_INFO=1
