@@ -595,7 +595,6 @@ deploy_container_instance(){
             APP_EXPORT_CONFIG_FILE="$APP_EXPORT_CONFIG_FILE" \
             APP_STATS_CONFIG_FILE="$APP_STATS_CONFIG_FILE" \
             APP_LOG_FILE="$APP_LOG_FILE" \
-        --tags "${TAGS[@]}" \
         --only-show-errors 2>&1)
     set -e
 
@@ -624,6 +623,27 @@ deploy_container_instance(){
     provisioning_state=$(echo "$result" | jq -r '.provisioningState')
     if [[ -z "$provisioning_state" || "$provisioning_state" != "Succeeded" ]]; then
         log_error "${command^} failed. Provisioning state is not Succeeded."
+        log_error "$result"
+        exit 1
+    fi
+
+    # Update tags on the container instance
+    log_info "Updating tags on container instance: $ACI_NAME"
+    set +e
+    result=$(az container update \
+        --resource-group "$RG_NAME" \
+        --name "$ACI_NAME" \
+        --set tags="$TAG_STRING" \
+        --only-show-errors 2>&1)
+    set -e
+    # Save file if LOG_DEBUG is enabled
+    if [[ $log_level -ge $LOG_DEBUG ]]; then
+        log_debug "Saving result to az_container_update.json."
+        echo "$result" >> "${PROJECT_ROOT}/.deploy_log/az_container_update.json"
+    fi
+    # Check for errors in the result
+    if grep -q "ERROR" <<< "$result"; then
+        log_error "${command^} failed due to an error."
         log_error "$result"
         exit 1
     fi
@@ -661,7 +681,6 @@ deploy_function_app(){
         --resource-group "$RG_NAME" \
         --build-remote true \
         --timeout 120 \
-        --tags "${TAGS[@]}" \
         --only-show-errors 2>&1)
     set -e
 
@@ -679,6 +698,30 @@ deploy_function_app(){
         log_error "$result"
         exit 1
     fi
+
+    # Update tags on the Function App
+    log_info "Updating tags on Function App: $funcapp_name"
+    set +e
+    result=$(az functionapp update \
+        --name "$funcapp_name" \
+        --resource-group "$RG_NAME" \
+        --set tags="$TAG_STRING" \
+        --only-show-errors 2>&1)
+    set -e
+
+    # Save file if LOG_DEBUG is enabled
+    if [[ $log_level -ge $LOG_DEBUG ]]; then
+        log_debug "Saving result to az_functionapp_update.json."
+        echo "$result" >> "${PROJECT_ROOT}/.deploy_log/az_functionapp_update.json"
+    fi
+
+    # Check for errors in the result
+    if grep -q "ERROR" <<< "$result"; then
+        log_error "${command^} failed due to an error."
+        log_error "$result"
+        exit 1
+    fi
+
 
     log_info "Successfully deployed Function App"
 
@@ -771,6 +814,14 @@ TAGS=(
     "version=$PROJECT_VERSION"
     "build=$BUILD_NUMBER"
 )
+TAG_STRING="{"
+for tag in "${TAGS[@]}"; do
+    key="${tag%%=*}"
+    value="${tag#*=}"
+    TAG_STRING+="\"$key\":\"$value\","
+done
+TAG_STRING="${TAG_STRING%,}}"
+readonly TAG_STRING
 
 # Log levels
 readonly LOG_ERROR=0
