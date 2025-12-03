@@ -12,6 +12,14 @@ on:
                 description: "Build and Push Docker"
                 default: false
                 type: boolean
+            deploy_container:
+                description: "Deploy Container Instance"
+                type: boolean
+                required: false
+            image_version:
+                description: "Docker Image Version to deploy"
+                type: string
+                required: false
             target:
                 description: "Environment to deploy to"
                 required: true
@@ -24,6 +32,13 @@ on:
 permissions:
   id-token: write # This is required for requesting the JWT
   contents: read # This is required for actions/checkout
+
+env:
+  ENVIRONMENT: ${{ vars.ENVIRONMENT  }}
+  LOCATION: ${{ vars.LOCATION }}
+  MODEL_NAME: ${{ vars.MODEL_NAME }}
+  MODEL_VERSION: ${{ vars.MODEL_VERSION }}
+  KEY_VAULT_NAME: ${{ vars.KEY_VAULT_NAME }}
 
 jobs:
     lint:
@@ -50,12 +65,8 @@ jobs:
     build_and_push_docker_image:
         runs-on: ubuntu-latest
         environment: ${{ inputs.target }}
-        env:
-          ENVIRONMENT: ${{ vars.ENVIRONMENT  }}
-          LOCATION: ${{ vars.LOCATION }}
-          MODEL_NAME: ${{ vars.MODEL_NAME }}
-          MODEL_VERSION: ${{ vars.MODEL_VERSION }}
-          KEY_VAULT_NAME: ${{ vars.KEY_VAULT_NAME }}
+        outputs:
+          image_version: ${{ steps.build-docker-image.outputs.image_version }}
         if: |
           !failure() && !cancelled() &&
           (
@@ -79,24 +90,18 @@ jobs:
                   --account-key "${{ secrets.ARTIFACT_STORAGE_KEY }}" \
 
             - name: Build docker image
+              id: build-docker-image
               run: |
                 version=$(./script/devops.sh build_image \
                   --channel dev)
                 
                 echo "IMAGE_VERSION=${version}" >> $GITHUB_ENV
+                echo "image_version=${version}" >> $GITHUB_OUTPUT
               env:
                 APP_INSTALLER_FILE: ${{ vars.APP_INSTALLER_FILE }}
                 APP_FILE: ${{ vars.APP_FILE }}
                 APP_SETUP_ARGS: ${{ vars.APP_SETUP_ARGS }}
                 APP_ALIAS: ${{ vars.APP_ALIAS }}
-                
-
-            # - name: Login to Azure Container Registry
-            #   uses: docker/login-action@v3
-            #   with:
-            #     registry: ${{ vars.CONTAINER_REGISTRY_NAME }}.azurecr.io
-            #     username: ${{ vars.CONTAINER_REGISTRY_USERNAME }}
-            #     password: ${{ secrets.CONTAINER_REGISTRY_PASSWORD }}
 
             - name: Publish Image
               run: |
@@ -105,3 +110,31 @@ jobs:
                 ./script/devops.sh publish_image \
                   --version "$version" \
                   --channel dev
+    
+    deploy_container_instance:
+        name: Deploy Container Instance
+        runs-on: ubuntu-latest
+        environment: ${{ inputs.target }}
+        if : |
+          !failure() && !cancelled() && 
+          (
+            github.event.inputs.deploy_container == 'true'
+          )
+        steps:
+          - name: Check out code from GitHub
+            uses: actions/checkout@v5
+
+          - name: OIDC Login to Azure
+            uses: azure/login@v2
+            with:
+              client-id: ${{ secrets.CICD_CLIENT_ID }}
+              tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+              subscription-id: ${{ secrets.SUBSCRIPTION_ID }}
+
+          - name: Deploy Container Instance
+            id: task-deploy-container
+            run: |
+              ./script/devops.sh deploy_container_instance \
+                --version "${{ github.event.inputs.image_version }}"
+            env:
+                APP_LOG_FILE: ${{ vars.APP_LOG_FILE }}

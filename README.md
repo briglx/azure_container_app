@@ -129,12 +129,9 @@ version=$(./script/devops.sh build_image \
 ```
 
 ### Push image
-
 ```bash
 # Login to remote registry
 # docker login -u "$CONTAINER_REGISTRY_USERNAME" -p "$CONTAINER_REGISTRY_PASSWORD" "${CONTAINER_REGISTRY_NAME}.azurecr.io"
-
-
 ./script/devops.sh publish_image \
     --version "$IMAGE_VERSION" \
     --debug
