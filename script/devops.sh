@@ -631,7 +631,7 @@ deploy_container_instance(){
 
     # Update tags on the container instance
     log_info "Updating tags on container instance: $ACI_NAME"
-    log_info "Tags: ${TAGS[@]}"
+    log_info "Tags: ${TAGS[*]}"
     set +e
     result=$(az tag update\
         --resource-id "$resource_id" \
@@ -825,6 +825,7 @@ readonly APP_STATS_CONFIG_FILE="/mnt/azurefiles/stats-config.json"
 RESOURCE_TOKEN=$(echo -n "${SUBSCRIPTION_ID}${PROJECT_NAME}${LOCATION}" | sha1sum | awk '{print $1}' | cut -c1-8)
 readonly RESOURCE_TOKEN
 
+# shellcheck disable=SC2191
 TAGS=(
     "asn=$ASN"
     "project=$PROJECT_NAME"
@@ -834,6 +835,7 @@ TAGS=(
     "version"="$PROJECT_VERSION"
     "build"="$BUILD_NUMBER"
 )
+# shellcheck disable=
 TAG_STRING="{"
 for tag in "${TAGS[@]}"; do
     key="${tag%%=*}"
