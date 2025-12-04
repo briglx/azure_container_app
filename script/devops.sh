@@ -77,9 +77,9 @@ show_help() {
     echo "  $0 upload_artifact -a mystorageaccount -k myaccountkey -c mycontainer -f ./local/artifact.zip -n myfolder/myartifact.zip"
     echo "  $0 fetch_artifact -a mystorageaccount -k myaccountkey -c mycontainer -n myfolder/myartifact.zip"
     echo "  $0 build_image -n myappimage -l dev"
-    echo "  $0 publish_image -v 1.0.0"
+    echo "  $0 publish_image -t 1.0.0"
     echo "  $0 upload_pipeline_config"
-    echo "  $0 deploy_container_instance -v 1.0.0"
+    echo "  $0 deploy_container_instance -t 1.0.0"
     echo "  $0 deploy_function_app"
 }
 
@@ -627,19 +627,21 @@ deploy_container_instance(){
         exit 1
     fi
 
+    resource_id=$(echo "$result" | jq -r '.id')
+
     # Update tags on the container instance
     log_info "Updating tags on container instance: $ACI_NAME"
     set +e
-    result=$(az container update \
-        --resource-group "$RG_NAME" \
-        --name "$ACI_NAME" \
-        --set tags="$TAG_STRING" \
+    result=$(az resource tag update\
+        --resource-id "$resource_id" \
+        --operation Merge \
+        --tags "${TAGS[@]}" \
         --only-show-errors 2>&1)
     set -e
     # Save file if LOG_DEBUG is enabled
     if [[ $log_level -ge $LOG_DEBUG ]]; then
-        log_debug "Saving result to az_container_update.json."
-        echo "$result" >> "${PROJECT_ROOT}/.deploy_log/az_container_update.json"
+        log_debug "Saving result to az_resource_tag_update.json."
+        echo "$result" >> "${PROJECT_ROOT}/.deploy_log/az_resource_tag_update.json"
     fi
     # Check for errors in the result
     if grep -q "ERROR" <<< "$result"; then
