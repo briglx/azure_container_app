@@ -631,8 +631,9 @@ deploy_container_instance(){
 
     # Update tags on the container instance
     log_info "Updating tags on container instance: $ACI_NAME"
+    log_info "Tags: ${TAGS[@]}"
     set +e
-    result=$(az resource tag update\
+    result=$(az tag update\
         --resource-id "$resource_id" \
         --operation Merge \
         --tags "${TAGS[@]}" \
@@ -640,8 +641,8 @@ deploy_container_instance(){
     set -e
     # Save file if LOG_DEBUG is enabled
     if [[ $log_level -ge $LOG_DEBUG ]]; then
-        log_debug "Saving result to az_resource_tag_update.json."
-        echo "$result" >> "${PROJECT_ROOT}/.deploy_log/az_resource_tag_update.json"
+        log_debug "Saving result to az_tag_update.json."
+        echo "$result" >> "${PROJECT_ROOT}/.deploy_log/az_tag_update.json"
     fi
     # Check for errors in the result
     if grep -q "ERROR" <<< "$result"; then
@@ -703,6 +704,7 @@ deploy_function_app(){
 
     # Update tags on the Function App
     log_info "Updating tags on Function App: $funcapp_name"
+    log_info "Tags: $TAG_STRING"
     set +e
     result=$(az functionapp update \
         --name "$funcapp_name" \
@@ -772,6 +774,21 @@ PROJECT_VERSION="$(grep -oP '(?<=^version = ")[^"]+' "${PROJECT_ROOT}/pyproject.
     exit 1
 }
 readonly PROJECT_VERSION
+ASN="$(grep -oP '(?<=^application_service_number = ")[^"]+' "${PROJECT_ROOT}/pyproject.toml"  | tr -d '\n')" || {
+    echo "Error: Could not extract application_service_number from pyproject.toml" >&2
+    exit 1
+}
+readonly ASN
+APP_OWNER="$(grep -oP '(?<=^application_owner = ")[^"]+' "${PROJECT_ROOT}/pyproject.toml"  | tr -d '\n')" || {
+    echo "Error: Could not extract application_owner from pyproject.toml" >&2
+    exit 1
+}
+readonly APP_OWNER
+SERVICE_TIER="$(grep -oP '(?<=^service_tier = ")[^"]+' "${PROJECT_ROOT}/pyproject.toml"  | tr -d '\n')" || {
+    echo "Error: Could not extract service_tier from pyproject.toml" >&2
+    exit 1
+}
+readonly SERVICE_TIER
 SCRIPT_NAME="$(basename "$0")" || {
     echo "Error: Could not determine script name" >&2
     exit 1
@@ -807,14 +824,15 @@ readonly APP_EXPORT_CONFIG_FILE="/mnt/azurefiles/export-config.json"
 readonly APP_STATS_CONFIG_FILE="/mnt/azurefiles/stats-config.json"
 RESOURCE_TOKEN=$(echo -n "${SUBSCRIPTION_ID}${PROJECT_NAME}${LOCATION}" | sha1sum | awk '{print $1}' | cut -c1-8)
 readonly RESOURCE_TOKEN
+
 TAGS=(
-    "asn=tbd"
+    "asn=$ASN"
     "project=$PROJECT_NAME"
-    "owner=tbd"
+    "owner=$APP_OWNER"
     "environment=$ENVIRONMENT"
-    "servicetier=tier3"
-    "version=$PROJECT_VERSION"
-    "build=$BUILD_NUMBER"
+    "servicetier=$SERVICE_TIER"
+    "version"="$PROJECT_VERSION"
+    "build"="$BUILD_NUMBER"
 )
 TAG_STRING="{"
 for tag in "${TAGS[@]}"; do

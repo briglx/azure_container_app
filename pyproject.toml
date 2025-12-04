@@ -16,6 +16,7 @@ dependencies = []
 short_name = "azcntnrapp"
 application_service_number = "APP20251110701bdfaa"
 application_owner = "briglx"
+service_tier = "Tier3"
 
 [tool.codespell]
 count = ''
