@@ -145,7 +145,6 @@ az storage blob upload \
     --account-key "$APP_STORAGE_KEY"
 ```
 
-
 ## References
 * https://learn.microsoft.com/en-us/azure/azure-functions/flex-consumption-plan
 * https://learn.microsoft.com/en-us/azure/azure-functions/functions-event-grid-blob-trigger?pivots=programming-language-python

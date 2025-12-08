@@ -258,7 +258,7 @@ fi
 # done
 
 test_webhook_url="https://$FUNC_APP_NAME.azurewebsites.net/admin/functions/$FUNC_NAME?code=${FUNC_KEY_MASTER}"
-webhook_url="https://${FUNC_APP_NAME}.azurewebsites.net/runtime/runtime/webhooks/EventGrid?functionName=${FUNC_NAME}&code=${FUNC_KEY}"
+webhook_url="https://${FUNC_APP_NAME}.azurewebsites.net/runtime/webhooks/EventGrid?functionName=${FUNC_NAME}&code=${FUNC_KEY}"
 
 echo "Checking webhook readiness..."
 for i in {1..10}; do
