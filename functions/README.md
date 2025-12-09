@@ -137,6 +137,10 @@ az eventgrid system-topic event-subscription create \
 timestamp=$(date -u +'%Y%m%d%H%M%SZ')
 test_file="test_$timestamp"
 touch "$test_file"
+# Add some filler content to the file
+echo "This is some temporary data." > "$test_file"
+
+
 az storage blob upload \
     --container-name "$APP_STORAGE_CONTAINER" \
     --file "$test_file" \

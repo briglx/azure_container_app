@@ -41,7 +41,8 @@ def process_blob_content(text_content, event_data):
 @app.event_grid_trigger(arg_name="event")
 def event_grid_test(event: func.EventGridEvent):
     logging.info(f"Eventgrid triggered")
-    result = json.dumps({
+
+    result_str = json.dumps( {
         'id': event.id,
         'data': event.get_json(),
         'topic': event.topic,
@@ -49,10 +50,11 @@ def event_grid_test(event: func.EventGridEvent):
         'event_type': event.event_type,
     })
 
-    logging.info('Python EventGrid trigger processed an event: %s', result)
+    logging.info('Python EventGrid trigger processed an event: %s', result_str)
 
     # Read file contents
-    blob_url = result['data']['url']   
+    event_data = event.get_json()
+    blob_url = event_data['url']   
     logging.info(f"Blob URL: {blob_url}")
 
     # Open the blob and read contents
