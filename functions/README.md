@@ -145,6 +145,31 @@ az storage blob upload \
     --account-key "$APP_STORAGE_KEY"
 ```
 
+Sample payload from event
+```json
+{
+    "id": "defcf2c4-b01e-00f4-34a2-682ec60614f2",
+    "data": {
+        "api": "PutBlob",
+        "clientRequestId": "dcd4b4ba-d495-11f0-a96d-00155d0a8cdb",
+        "requestId": "defcf2c4-b01e-00f4-34a2-682ec6000000",
+        "eTag": "0x8DE36B9C120C402",
+        "contentType": "application/octet-stream",
+        "contentLength": 0,
+        "blobType": "BlockBlob",
+        "accessTier": "Default",
+        "url": "https://APP_STORAGE_CONTAINER.blob.core.windows.net/APP_STORAGE_INPUT_PATH/test_20251209002732Z",
+        "sequencer": "0000000000000000000000000000002600000000009a2a72",
+        "storageDiagnostics": {
+            "batchId": "1479b98f-1006-00c2-00a2-68a3b6000000"
+        }
+    },
+    "topic": "/subscriptions/SUBSCRIPTION_ID/resourceGroups/RG_NAME/providers/Microsoft.Storage/storageAccounts/APP_STORAGE_ACCOUNT_NAME",
+    "subject": "/blobServices/default/containers/APP_STORAGE_CONTAINER/blobs/APP_STORAGE_INPUT_PATH/test_20251209002732Z",
+    "event_type": "Microsoft.Storage.BlobCreated"
+}
+```
+
 ## References
 * https://learn.microsoft.com/en-us/azure/azure-functions/flex-consumption-plan
 * https://learn.microsoft.com/en-us/azure/azure-functions/functions-event-grid-blob-trigger?pivots=programming-language-python
