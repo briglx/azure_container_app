@@ -1,0 +1,15 @@
+{
+    "env_vars": [
+        {"name": "APP_RUNTIME_CONFIG_FILE", "value": "/mnt/azurefiles/runtime-config.json"},
+        {"name": "APP_EXPORT_CONFIG_FILE", "value": "/mnt/azurefiles/input/file2.txt"},
+        {"name": "APP_STATS_CONFIG_FILE", "value": "/mnt/azurefiles/stats-config.json"},
+        {"name": "APP_LOG_FILE", "value": "/path/to/log"}
+    ],
+    "files": [
+        "path/to/secondary_source/file",
+        "incoming/test_20251209193849Z.json" ,
+        "incoming/test_20251209012921Z",
+        "incoming/test_20251209193918Z.json" ,
+        "incoming/emptyfile"
+    ]
+}

@@ -135,12 +135,10 @@ az eventgrid system-topic event-subscription create \
 
 # Test
 timestamp=$(date -u +'%Y%m%d%H%M%SZ')
-test_file="test_$timestamp"
+test_file="test_${timestamp}.json"
 touch "$test_file"
 # Add some filler content to the file
-echo "This is some temporary data." > "$test_file"
-
-
+echo '{"timestamp":"'$(date -u +'%Y-%m-%dT%H:%M:%SZ')'","event":"test","data":{"id":1,"name":"test","value":123}}' > "$test_file"
 az storage blob upload \
     --container-name "$APP_STORAGE_CONTAINER" \
     --file "$test_file" \

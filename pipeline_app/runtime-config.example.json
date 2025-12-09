@@ -1,8 +1,12 @@
 {
     "file_name": "__OUTPUT__",
+    "primary_file": "path/to/primary_source/file",
+    "primary_format_file": "path/to/primary_format/file",
+    "secondary_file": "path/to/secondary_source/file",
+    "secondary_format_file": "path/to/secondary_format/file",
     "name": "the resource name",
     "location": "sample location",
     "query": "JMESPath query to filter data",
     "output": "json",
     "skip": ""
-  }
+}
