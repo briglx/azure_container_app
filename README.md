@@ -1,6 +1,6 @@
 # File Processing Pipeline
 
-Example project demonstrating an automated workflow for file processing. Uploading a file triggers a containerized application that processes the file and writes results back to the storage account. 
+Example project demonstrating an automated workflow for file processing. Uploading a file triggers a containerized application that processes the file and writes results back to the storage account.
 
 ![Architecture Overview](./docs/architecture_overview.drawio.svg)
 
@@ -77,7 +77,7 @@ Solution Resources
 
 This approach uses a centralized artifact store for binaries. Blob storage account is the artifact store
 ```bash
-# Download your binary that needs to be deployed in the container as ARTIFACT_NAME. 
+# Download your binary that needs to be deployed in the container as ARTIFACT_NAME.
 curl /path/to/files -o "$ARTIFACT_NAME"
 
 # Upload to a shared artifact location in blob storage
@@ -185,6 +185,11 @@ python -m pip install --upgrade pip
 
 # Install dependencies
 pip install -r requirements_dev.txt
+
+# Configure linting and formatting tools
+sudo apt-get update
+sudo apt-get install -y shellcheck
+pre-commit install
 ```
 ## Running the Application
 
@@ -200,18 +205,18 @@ docker run -it --entrypoint /bin/bash -p 5000:5000  "$image_name"
 
 Once your container instance has been deployed, you can manually start it and connect for interactive debugging or runtime inspection.
 
-> **Prerequisite**  
-> Ensure your user or service principal has the following Azure role:  
-> **`Microsoft.ContainerInstance/containerGroups/start/action`**  
-> **`Microsoft.ContainerInstance/containerGroups/containers/exec/action`** 
-> **`Microsoft.ContainerInstance/containerGroups/restart/action`**   
+> **Prerequisite**
+> Ensure your user or service principal has the following Azure role:
+> **`Microsoft.ContainerInstance/containerGroups/start/action`**
+> **`Microsoft.ContainerInstance/containerGroups/containers/exec/action`**
+> **`Microsoft.ContainerInstance/containerGroups/restart/action`**
 > These permission are included in the **Contributor** or **Azure Container Instance Contributor** roles.
 
 ```bash
 # If the container is in a **Terminated** or **Stopped** state, use the following command to start it:
 az container start \
     --resource-group "$ACI_RESOURCE_GROUP" \
-    --name "$ACI_NAME" 
+    --name "$ACI_NAME"
 
 # Connect to the Running Container with an Interactive shell
 az container exec \
@@ -237,11 +242,14 @@ Summary of the most relevant points:
 
 ```bash
 # Run linters with pre-commit
-pre-commit run --hook-stage isort --all-files
-pre-commit run --hook-stage codespell --all-files
-pre-commit run --hook-stage yamllint --all-files
-pre-commit run --hook-stage check-executables-have-shebangs --all-files
-pre-commit run --hook-stage manual python-typing-update --all-files
+pre-commit run --hook-stage manual isort --all-files
+pre-commit run --hook-stage manual codespell --all-files
+pre-commit run --hook-stage manual yamllint --all-files
+pre-commit run --hook-stage manual check-executables-have-shebangs --all-files
+pre-commit run --hook-stage manual check-docstring-first --all-files
+pre-commit run --hook-stage manual check-json --all-files
+pre-commit run --hook-stage manual prettier --all-files
+
 
 # Run linters outside of pre-commit
 isort .
@@ -256,14 +264,14 @@ shellcheck -x ./script/*.sh
 
 Various notes.
 
-## Mounting network files in docker 
+## Mounting network files in docker
 
 * At image build time
 * At container create time
 * At run time
 
 ```bash
-# Get network storage key 
+# Get network storage key
 set +e
 APP_STORAGE_KEY=$(az storage account keys list \
     --resource-group "$APP_STORAGE_RG" \
@@ -299,7 +307,7 @@ az container create \
 
 
 # At Run Time - mount on host and run with volume ------------------------------------------------
-sudo mkdir -p /mnt/azurefiles 
+sudo mkdir -p /mnt/azurefiles
 sudo mount -t cifs //${APP_STORAGE_ACCOUNT_NAME}.file.core.windows.net/share \
     /mnt/azurefiles \
     -o "vers=3.0,username=${APP_STORAGE_ACCOUNT_NAME},password="$APP_STORAGE_KEY",dir_mode=0777,file_mode=0777,serverino"
