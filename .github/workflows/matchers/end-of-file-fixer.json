@@ -1,0 +1,11 @@
+{
+    "owner": "end-of-file-fixer",
+    "pattern": [
+        {
+            "regexp": "^Fixing\\s+(.+)$",
+            "file": 1,
+            "message": 0,
+            "severity": "warning"
+        }
+    ]
+}

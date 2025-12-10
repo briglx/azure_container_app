@@ -189,6 +189,9 @@ jobs:
         env:
           RUFF_OUTPUT_FORMAT: github
 
+      - name: Register yamllint problem matcher
+        run: |
+          echo "::add-matcher::.github/workflows/matchers/yamllint.json"
       - name: Run yamllint
         run: |
           . venv/bin/activate
@@ -214,6 +217,9 @@ jobs:
           . venv/bin/activate
           pre-commit run --hook-stage manual check-json --all-files --show-diff-on-failure
 
+      - name: Register end-of-file-fixer problem matcher
+        run: |
+          echo "::add-matcher::.github/workflows/matchers/end-of-file-fixer.json"
       - name: end-of-file-fixer
         run: |
           . venv/bin/activate
@@ -234,6 +240,9 @@ jobs:
           . venv/bin/activate
           pre-commit run --hook-stage manual trailing-whitespace --all-files --show-diff-on-failure
 
+      - name: Register codespell problem matcher
+        run: |
+          echo "::add-matcher::.github/workflows/matchers/codespell.json"
       - name: Run codespell
         run: |
           . venv/bin/activate
