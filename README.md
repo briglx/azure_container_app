@@ -276,13 +276,13 @@ pre-commit run --hook-stage manual check-shebang-scripts-are-executable --all-fi
 pre-commit run --hook-stage manual check-executables-have-shebangs --all-files
 pre-commit run --hook-stage manual check-toml --all-files
 pre-commit run --hook-stage manual check-json --all-files
-pre-commit run --hook-stage manual end-of-file-fixer --all-files --show-diff-on-failure
-pre-commit run --hook-stage manual fix-byte-order-marker --all-files --show-diff-on-failure
-pre-commit run --hook-stage manual mixed-line-ending --all-files --show-diff-on-failure
-pre-commit run --hook-stage manual trailing-whitespace --all-files --show-diff-on-failure
-pre-commit run --hook-stage manual codespell --all-files --show-diff-on-failure
-pre-commit run --hook-stage manual shellcheck --all-files --show-diff-on-failure
-pre-commit run --hook-stage manual hadolint-docker --all-files --show-diff-on-failure
+pre-commit run --hook-stage manual end-of-file-fixer --all-files
+pre-commit run --hook-stage manual fix-byte-order-marker --all-files
+pre-commit run --hook-stage manual mixed-line-ending --all-files
+pre-commit run --hook-stage manual trailing-whitespace --all-files
+pre-commit run --hook-stage manual codespell --all-files
+pre-commit run --hook-stage manual shellcheck --all-files
+pre-commit run --hook-stage manual hadolint-docker --all-files
 
 # Run linters outside of pre-commit
 isort .
