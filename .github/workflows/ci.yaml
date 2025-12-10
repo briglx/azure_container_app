@@ -102,7 +102,6 @@ jobs:
           echo "key=venv-${{ env.CACHE_VERSION }}-${{
             hashFiles('requirements.txt') }}-${{
             hashFiles('requirements_dev.txt') }}" >> $GITHUB_OUTPUT
-
   pre-commit:
     name: Prepare pre-commit base
     runs-on: *runs-on-ubuntu
@@ -148,7 +147,7 @@ jobs:
   lint:
     name: Lint Code
     runs-on: *runs-on-ubuntu
-    needs: &needs-pre-commit
+    needs:
       - info
       - pre-commit
     steps:
@@ -184,9 +183,8 @@ jobs:
       - name: Lint code
         run: |
           shellcheck -x ${{ github.workspace }}/script/*.sh
-
   build_and_push_docker_image:
-    needs: *needs-pre-commit
+    needs: [info, lint]
     runs-on: *runs-on-ubuntu
     environment: ${{ needs.info.outputs.channel }}
     outputs:
@@ -199,8 +197,7 @@ jobs:
         (github.event_name == 'push')
       )
     steps:
-      - name: Check out code from GitHub
-        uses: actions/checkout@v5
+      - *checkout
 
       - name: OIDC Login to Azure
         uses: azure/login@v2
@@ -236,10 +233,9 @@ jobs:
           ./script/devops.sh publish_image \
             --tag "$build_tag" \
             --channel dev
-
   deploy_container_instance:
     name: Deploy Container Instance
-    needs: [build_and_push_docker_image]
+    needs: [info, build_and_push_docker_image]
     runs-on: *runs-on-ubuntu
     environment: ${{ needs.info.outputs.channel }}
     if: |
@@ -250,8 +246,7 @@ jobs:
         (github.event_name == 'push')
       )
     steps:
-      - name: Check out code from GitHub
-        uses: actions/checkout@v5
+      - *checkout
 
       - name: OIDC Login to Azure
         uses: azure/login@v2
@@ -267,9 +262,10 @@ jobs:
             --tag "${{ github.event_name == 'workflow_dispatch' && github.event.inputs.image_tag || needs.build_and_push_docker_image.outputs.build_tag }}"
         env:
           APP_LOG_FILE: ${{ vars.APP_LOG_FILE }}
+
   deploy_function_app:
     name: Deploy Function App
-    needs: *needs-pre-commit
+    needs: [info, lint]
     runs-on: *runs-on-ubuntu
     environment: ${{ needs.info.outputs.channel }}
     if: |
@@ -280,8 +276,7 @@ jobs:
         (github.event_name == 'push')
       )
     steps:
-      - name: Check out code from GitHub
-        uses: actions/checkout@v5
+      - *checkout
 
       - name: OIDC Login to Azure
         uses: azure/login@v2

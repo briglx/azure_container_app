@@ -12,9 +12,9 @@ Configure the environment variables. Copy `example.env` to `.env` and update the
 
 The solution use system identities to deploy cloud resources. The following table lists the system identities and their purpose.
 
-| System Identities                 | Authentication                                             | Authorization                                                                                                                                                                  | Purpose                                                                            |
-| --------------------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------- |
-| `env.CICD_CLIENT_NAME`      | OpenId Connect (OIDC) based Federated Identity Credentials | <ul><li>Subscription Contributor OR Owner OR</li><li>Storage Account Contributor, Storage Account Key Operator Service Role, Storage Blob Data Contributor, AcrPush, Monitoring Contributor OR</li><li>Custom Role</li><li><ul><li>`Microsoft.Resources/subscriptions/resourceGroups/write`</li><li>`Microsoft.Storage/storageAccounts/write`</li><li>`Microsoft.Storage/storageAccounts/listKeys/action`</li><li>`Microsoft.Storage/storageAccounts/blobServices/containers/write`</li><li>`Microsoft.ContainerRegistry/registries/write`</li><li>`Microsoft.ContainerRegistry/registries/tokens/write`</li><li>`Microsoft.OperationalInsights/workspaces/write`</li></ul>  | Deploy Shared resources: <ul><li>Resource Group</li><li>Storage Account</li><li>Container Registry</li><li>Log Analytics Workspace</li></ul></li></ul> |
+| System Identities      | Authentication                                             | Details |
+| -----------------------| ---------------------------------------------------------- | --------|
+| `env.CICD_CLIENT_NAME` | OpenId Connect (OIDC) based Federated Identity Credentials | `{"subject":"repo:$GITHUB_ORG/$GITHUB_REPO:environment:$ENVIRONMENT"}` |
 
 Role Detail for `env.CICD_CLIENT_NAME` to provision shared resources
 
@@ -29,7 +29,30 @@ Role Detail for `env.CICD_CLIENT_NAME` to provision shared resources
 | `/subscription/sub-common/resource_group/rg-common/` | Provision Shared Key Vault | `Key Vault Contributor` | <ul><li>`"Microsoft.KeyVault/vaults/write`</li></ul> |
 | `/subscription/sub-common/resource_group/rg-common/keyvault/kv-common` | Set Shared secrets | `Key Vault Secrets Officer` | <ul><li>`Microsoft.KeyVault/vaults/secrets/setSecret/action`</li></ul> |
 
-Key Vault Secrets Officer
+Role Detail for `env.CICD_CLIENT_NAME` to provision solution resources
+| Permission Scope | Purpose | Built in Role | Least Privlage |
+| --- | --- | --- | --- |
+|  `/subscription/sub-solution/`  | Provision Solution Resources - Resource Group  | `Subscription Contributor`  | <ul><li>`Microsoft.Resources/subscriptions/resourceGroups/write`</li></ul> |
+| `/subscription/sub-solution/resource_group/rg-solution/` | Provision Primary and Function App Storage Accounts| `Storage Account Contributor` | <ul><li>`Microsoft.Storage/storageAccounts/read`</li><li>`Microsoft.Storage/storageAccounts/write`</li></ul> |
+| `/subscription/sub-solution/resource_group/rg-solution/storage/stprimary` | Provision Pipeline Container - Storage Account Container | `Storage Blob Data Contributor` | <ul><li>`Microsoft.Storage/storageAccounts/blobServices/containers/read`</li><li>`Microsoft.Storage/storageAccounts/blobServices/containers/write`</li></ul> |
+| `/subscription/sub-solution/resource_group/rg-solution/storage/stprimary` | Provision Default Directories - Storage Account Blobs | `Storage Blob Data Contributor` | <ul><li>`Microsoft.Storage/storageAccounts/blobServices/containers/blobs/read`</li><li>`Microsoft.Storage/storageAccounts/blobServices/containers/blobs/write`</li></ul> |
+| `/subscription/sub-solution/resource_group/rg-solution/storage/stprimary` | Provision Shared - Storage Account Share | `Storage File Data SMB Share Contributor` | <ul><li>`Microsoft.Storage/storageAccounts/fileServices/shares/write`</li></ul> |
+| `/subscription/sub-solution/resource_group/rg-solution/` | Event Grid Topic | `EventGrid Contributor` | <ul><li>`Microsoft.EventGrid/systemTopics/write`</li></ul> |
+| `/subscription/sub-solution/resource_group/rg-solution/storage/stprimary` | Event Grid Topic | `Reader` | <ul><li>`Microsoft.EventGrid/systemTopics/eventSubscriptions/read`</li></ul> |
+| `/subscription/sub-solution/resource_group/rg-solution/storage/stprimary` | Configure Function app to read storage content | `Storage Account Key Operator Service Role` | <ul><li>`Microsoft.Storage/storageAccounts/listkeys/action`</li></ul> |
+| `/subscription/sub-solution/resource_group/rg-solution/systemTopics/evgstprimary/eventSubscriptions/evgsblob2func` | Configure Event Grid Subscription | `EventGrid EventSubscription Contributor` | <ul><li>`Microsoft.EventGrid/systemTopics/eventSubscriptions/write`</li></ul> |
+| `/subscription/sub-solution/resource_group/rg-solution/systemTopics/evgstprimary` | Configure Event Grid Subscription | `EventGrid EventSubscription Contributor` | <ul><li>`Microsoft.EventGrid/systemTopics/write`</li></ul> |
+| `/subscription/sub-solution/resource_group/rg-solution/` | Provision Solution Primary Storage Account | `Storage Account Contributor` | <ul><li>`Microsoft.Storage/storageAccounts/read`</li><li>`Microsoft.Storage/storageAccounts/write`</li></ul> |
+| `/subscription/sub-common/resource_group/rg-common/keyvault/kv-common`  | Read Shared secrets | `Key Vault Secrets User` | <ul><li>`Microsoft.KeyVault/vaults/secrets/getSecret/action`</li></ul> |
+| `/subscription/sub-solution/resource_group/rg-solution/`   | Read Shared secrets | `Application Insights Component Contributor` | <ul><li>`microsoft.insights/components/read`</li><li>`microsoft.insights/components/write`</li></ul> |
+| `/subscription/sub-solution/resource_group/rg-solution/`   | Create function app | `Website Contributor` | <ul><li>`Microsoft.Web/sites/read`</li><li>`Microsoft.Web/sites/write`</li><li>`Microsoft.Web/sites/config/write`</li></ul> |
+| `/subscription/sub-solution/resource_group/rg-solution/func-app`   | Configure Event trigger | `Website Contributor` | <ul><li>`Microsoft.Web/sites/host/listkeys/action`</li></ul> |
+
+Admin level roles
+| Permission Scope | Purpose | Built in Role | Least Privlage |
+| --- | --- | --- | --- |
+|  `/subscription/sub-solution/`  | Register Container Instance resource provider  | `Subscription Contributor`  | <ul><li>`Microsoft.Resources/subscriptions/resourceProviders/register/action`</li></ul> |
+
 ```bash
 # Configure the environment variables. Copy `example.env` to `.env` and update the values
 cp example.env .env
@@ -123,6 +146,7 @@ target_file="${ARTIFACT_FOLDER}/${ARTIFACT_NAME}"
 
 ### Build docker image
 ```bash
+# Save version to use in next step
 version=$(./script/devops.sh build_image \
     --channel dev \
     --debug)
@@ -155,8 +179,10 @@ version=$(./script/devops.sh build_image \
 ```bash
 ./script/devops.sh deploy_function_app \
     --debug
-```
 
+# Trigger app by uploading a test file
+./script/devops_create_testfile.sh
+```
 
 # Development
 
