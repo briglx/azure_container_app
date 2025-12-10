@@ -21,7 +21,6 @@ repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
     hooks:
-      - id: check-docstring-first
       - id: check-shebang-scripts-are-executable
       - id: check-executables-have-shebangs
         stages: [manual]

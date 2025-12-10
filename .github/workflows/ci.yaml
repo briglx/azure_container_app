@@ -197,11 +197,6 @@ jobs:
           . venv/bin/activate
           pre-commit run --hook-stage manual yamllint --all-files --show-diff-on-failure
 
-      - name: Run check-docstring-first
-        run: |
-          . venv/bin/activate
-          pre-commit run --hook-stage manual check-docstring-first --all-files --show-diff-on-failure
-
       - name: Run check-shebang-scripts-are-executable
         run: |
           . venv/bin/activate

@@ -122,7 +122,7 @@ az functionapp deployment source config-zip \
 ```
 
 Finish Deploying Resources after app is deployed
-```bash    
+```bash
 
 # It is expected that the destination endpoint to be already created and available for use before executing any Event Grid command.
 az eventgrid system-topic event-subscription create \
