@@ -98,9 +98,18 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r ${{ github.workspace }}/requirements_dev.txt
 
+      - name: Run isort
+        run: |
+          . venv/bin/activate
+          pre-commit run --hook-stage manual isort --all-files --show-diff-on-failure
+
+      - name: Run codespell
+        run: |
+          . venv/bin/activate
+          pre-commit run --hook-stage manual codespell --all-files --show-diff-on-failure
+
       - name: Lint code
         run: |
-          codespell "${{ github.workspace }}"
           shellcheck -x ${{ github.workspace }}/script/*.sh
 
   build_and_push_docker_image:
