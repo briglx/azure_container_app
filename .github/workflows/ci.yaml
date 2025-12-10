@@ -175,14 +175,74 @@ jobs:
           . venv/bin/activate
           pre-commit run --hook-stage manual isort --all-files --show-diff-on-failure
 
+      - name: Run ruff-format
+        run: |
+          . venv/bin/activate
+          pre-commit run --hook-stage manual ruff-format --all-files --show-diff-on-failure
+        env:
+          RUFF_OUTPUT_FORMAT: github
+
+      - name: Run ruff-check
+        run: |
+          . venv/bin/activate
+          pre-commit run --hook-stage manual ruff-check --all-files --show-diff-on-failure
+        env:
+          RUFF_OUTPUT_FORMAT: github
+
+      - name: Run yamllint
+        run: |
+          . venv/bin/activate
+          pre-commit run --hook-stage manual yamllint --all-files --show-diff-on-failure
+
+      - name: Run check-docstring-first
+        run: |
+          . venv/bin/activate
+          pre-commit run --hook-stage manual check-docstring-first --all-files --show-diff-on-failure
+
+      - name: Run check-shebang-scripts-are-executable
+        run: |
+          . venv/bin/activate
+          pre-commit run --hook-stage manual check-shebang-scripts-are-executable --all-files --show-diff-on-failure
+
+      - name: Run check-executables-have-shebangs
+        run: |
+          . venv/bin/activate
+          pre-commit run --hook-stage manual check-executables-have-shebangs --all-files --show-diff-on-failure
+
+      - name: Run check-json
+        run: |
+          . venv/bin/activate
+          pre-commit run --hook-stage manual check-json --all-files --show-diff-on-failure
+
+      - name: end-of-file-fixer
+        run: |
+          . venv/bin/activate
+          pre-commit run --hook-stage manual end-of-file-fixer --all-files --show-diff-on-failure
+
+      - name: fix-byte-order-marker
+        run: |
+          . venv/bin/activate
+          pre-commit run --hook-stage manual fix-byte-order-marker --all-files --show-diff-on-failure
+
+      - name: mixed-line-ending
+        run: |
+          . venv/bin/activate
+          pre-commit run --hook-stage manual mixed-line-ending --all-files --show-diff-on-failure
+
+      - name: trailing-whitespace
+        run: |
+          . venv/bin/activate
+          pre-commit run --hook-stage manual trailing-whitespace --all-files --show-diff-on-failure
+
       - name: Run codespell
         run: |
           . venv/bin/activate
           pre-commit run --hook-stage manual codespell --all-files --show-diff-on-failure
 
-      - name: Lint code
+      - name: Shell check
         run: |
           shellcheck -x ${{ github.workspace }}/script/*.sh
+
   build_and_push_docker_image:
     needs: [info, lint]
     runs-on: *runs-on-ubuntu

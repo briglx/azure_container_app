@@ -1,8 +1,9 @@
 repos:
-  - repo: 'https://github.com/pycqa/isort'
+  - repo: https://github.com/pycqa/isort
     rev: 5.13.2
     hooks:
       - id: isort
+
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.13.0
     hooks:
@@ -11,15 +12,12 @@ repos:
           - --fix
       - id: ruff-format
         files: ^((functions|script|tests)/.+)?[^/]+\.(py|pyi)$
-  - repo: https://github.com/codespell-project/codespell
-    rev: v2.4.1
+
+  - repo: https://github.com/adrienverge/yamllint.git
+    rev: v1.37.1
     hooks:
-      - id: codespell
-        args:
-          - '--skip="./.*,*.csv,*.json,*.pyc,./docs/_build/*,./htmlcov/*"'
-          - '--quiet-level=2'
-        exclude_types: [csv, json]
-        exclude: ^tests/fixtures/|tests/components/.*/snapshots/
+      - id: yamllint
+
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
     hooks:
@@ -33,7 +31,13 @@ repos:
       - id: fix-byte-order-marker
       - id: mixed-line-ending
       - id: trailing-whitespace
-  - repo: https://github.com/adrienverge/yamllint.git
-    rev: v1.37.1
+
+  - repo: https://github.com/codespell-project/codespell
+    rev: v2.4.1
     hooks:
-      - id: yamllint
+      - id: codespell
+        args:
+          - '--skip="./.*,*.csv,*.json,*.pyc,./docs/_build/*,./htmlcov/*"'
+          - '--quiet-level=2'
+        exclude_types: [csv, json]
+        exclude: ^tests/fixtures/|tests/components/.*/snapshots/
