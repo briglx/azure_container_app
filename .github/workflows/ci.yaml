@@ -89,7 +89,8 @@ jobs:
             echo "Detected branch: $REF_NAME, setting target: $TARGET"
           fi
 
-          echo "channel=staging" >> $
+          echo "channel=staging" >> $GITHUB_OUTPUT
+
       - name: Generate partial pre-commit restore key
         id: generate_pre-commit_cache_key
         run: >-
