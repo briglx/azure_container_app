@@ -1,0 +1,46 @@
+repos:
+  - repo: 'https://github.com/pycqa/isort'
+    rev: 5.13.2
+    hooks:
+      - id: isort
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.13.0
+    hooks:
+      - id: ruff-check
+        args:
+          - --fix
+      - id: ruff-format
+        files: ^((functions|script|tests)/.+)?[^/]+\.(py|pyi)$
+  - repo: https://github.com/codespell-project/codespell
+    rev: v2.4.1
+    hooks:
+      - id: codespell
+        args:
+          - '--skip="./.*,*.csv,*.json,*.pyc,./docs/_build/*,./htmlcov/*"'
+          - '--quiet-level=2'
+        exclude_types: [csv, json]
+        exclude: ^tests/fixtures/|tests/components/.*/snapshots/
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: check-docstring-first
+      - id: check-shebang-scripts-are-executable
+      - id: check-executables-have-shebangs
+        stages: [manual]
+      - id: check-json
+        exclude: (.vscode|.devcontainer)
+      - id: end-of-file-fixer
+      - id: fix-byte-order-marker
+      - id: mixed-line-ending
+      - id: trailing-whitespace
+  - repo: https://github.com/adrienverge/yamllint.git
+    rev: v1.37.1
+    hooks:
+      - id: yamllint
+  - repo: https://github.com/rbubley/mirrors-prettier
+    rev: v3.6.2
+    hooks:
+      - id: prettier
+        additional_dependencies:
+          - prettier@3.6.2
+          - prettier-plugin-sort-json@4.1.1

@@ -2,37 +2,37 @@ name: CI
 run-name: "${{ github.event_name == 'workflow_dispatch' && format('CI: {0}', github.ref_name) || '' }}"
 
 on:
-    push:
-        branches:
-            - main
-            - 'release/*'
-    workflow_dispatch:
-        inputs:
-            build_and_push:
-                description: "Build and Push Docker"
-                default: false
-                type: boolean
-            deploy_container:
-                description: "Deploy Container Instance"
-                type: boolean
-                required: false
-            image_tag:
-                description: "Deploy Container Instance - Image Tag. A specific version/build of the image."
-                type: string
-                required: false
-            deploy_function:
-                description: "Deploy Function App"
-                type: boolean
-                required: false
-            target:
-                description: "Environment to deploy to"
-                required: true
-                default: "staging"
-                type: choice
-                options:
-                  - production
-                  - staging
-                  - dev
+  push:
+    branches:
+      - main
+      - 'release/*'
+  workflow_dispatch:
+    inputs:
+      build_and_push:
+        description: "Build and Push Docker"
+        default: false
+        type: boolean
+      deploy_container:
+        description: "Deploy Container Instance"
+        type: boolean
+        required: false
+      image_tag:
+        description: "Deploy Container Instance - Image Tag. A specific version/build of the image."
+        type: string
+        required: false
+      deploy_function:
+        description: "Deploy Function App"
+        type: boolean
+        required: false
+      target:
+        description: "Environment to deploy to"
+        required: true
+        default: "staging"
+        type: choice
+        options:
+          - production
+          - staging
+          - dev
 permissions:
   id-token: write # This is required for requesting the JWT
   contents: read # This is required for actions/checkout
@@ -45,172 +45,172 @@ env:
   KEY_VAULT_NAME: ${{ vars.KEY_VAULT_NAME }}
 
 jobs:
-    init:
-      name: Initialize build
-      runs-on: ubuntu-latest
-      outputs:
-        channel: ${{ steps.version.outputs.channel }}
-      steps:
-        - shell: bash
-          id: version
-          env:
-            EVENT_NAME: ${{ github.event_name }}
-            REF_NAME: ${{ github.ref_name }}
-            WORKFLOW_TARGET: ${{ github.event.inputs.target }}
-          run: |
+  init:
+    name: Initialize build
+    runs-on: ubuntu-latest
+    outputs:
+      channel: ${{ steps.version.outputs.channel }}
+    steps:
+      - shell: bash
+        id: version
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+          WORKFLOW_TARGET: ${{ github.event.inputs.target }}
+        run: |
 
-            if [[ "$EVENT_NAME" == "workflow_dispatch" && -n "$WORKFLOW_TARGET" ]]; then
-              TARGET="$WORKFLOW_TARGET"
-              echo "Using workflow dispatch target: $TARGET"
-            else
-              # Set environment based on branch
-              case "$REF_NAME" in
-                main|master)
-                  TARGET="production"
-                  ;;
-                staging)
-                  TARGET="staging"
-                  ;;
-                develop)
-                  TARGET="dev"
-                  ;;
-                *)
-                  TARGET="dev"
-                  ;;
-              esac
-              echo "Detected branch: $REF_NAME, setting target: $TARGET"
-            fi
-            
-            echo "channel=staging" >> $GITHUB_OUTPUT
-    lint:
-        runs-on: ubuntu-latest
-        steps:
-            - name: Check out code from GitHub
-              uses: actions/checkout@v5
+          if [[ "$EVENT_NAME" == "workflow_dispatch" && -n "$WORKFLOW_TARGET" ]]; then
+            TARGET="$WORKFLOW_TARGET"
+            echo "Using workflow dispatch target: $TARGET"
+          else
+            # Set environment based on branch
+            case "$REF_NAME" in
+              main|master)
+                TARGET="production"
+                ;;
+              staging)
+                TARGET="staging"
+                ;;
+              develop)
+                TARGET="dev"
+                ;;
+              *)
+                TARGET="dev"
+                ;;
+            esac
+            echo "Detected branch: $REF_NAME, setting target: $TARGET"
+          fi
 
-            - name: Set up Python
-              uses: actions/setup-python@v4
-              with:
-                python-version: '3.12'
+          echo "channel=staging" >> $GITHUB_OUTPUT
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code from GitHub
+        uses: actions/checkout@v5
 
-            - name: Install dependencies
-              run: |
-                python -m pip install --upgrade pip
-                pip install -r ${{ github.workspace }}/requirements_dev.txt
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
 
-            - name: Lint code
-              run: |
-                codespell "${{ github.workspace }}"
-                shellcheck -x ${{ github.workspace }}/script/*.sh
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r ${{ github.workspace }}/requirements_dev.txt
 
-    build_and_push_docker_image:
-        needs: [init, lint]
-        runs-on: ubuntu-latest
-        environment: ${{ needs.init.outputs.channel }}
-        outputs:
-          build_tag: ${{ steps.build-docker-image.outputs.build_tag }}
-        if: |
-          !failure() && !cancelled() &&
-          (
-            (github.event_name != 'workflow_dispatch' && github.event.inputs.build_and_push == 'true')
-           || 
-            (github.event_name == 'push')
-          )
-        steps:
-            - name: Check out code from GitHub
-              uses: actions/checkout@v5
+      - name: Lint code
+        run: |
+          codespell "${{ github.workspace }}"
+          shellcheck -x ${{ github.workspace }}/script/*.sh
 
-            - name: OIDC Login to Azure
-              uses: azure/login@v2
-              with:
-                client-id: ${{ secrets.CICD_CLIENT_ID }}
-                tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-                subscription-id: ${{ secrets.SUBSCRIPTION_ID }}
+  build_and_push_docker_image:
+    needs: [init, lint]
+    runs-on: ubuntu-latest
+    environment: ${{ needs.init.outputs.channel }}
+    outputs:
+      build_tag: ${{ steps.build-docker-image.outputs.build_tag }}
+    if: |
+      !failure() && !cancelled() &&
+      (
+        (github.event_name != 'workflow_dispatch' && github.event.inputs.build_and_push == 'true')
+        ||
+        (github.event_name == 'push')
+      )
+    steps:
+      - name: Check out code from GitHub
+        uses: actions/checkout@v5
 
-            - name: Fetch Artifact
-              run: |
-                ./script/devops.sh fetch_artifact \
-                  --account-name "${{ vars.ARTIFACT_STORAGE_ACCOUNT }}" \
-                  --account-key "${{ secrets.ARTIFACT_STORAGE_KEY }}" \
+      - name: OIDC Login to Azure
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.CICD_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.SUBSCRIPTION_ID }}
 
-            - name: Build docker image
-              id: build-docker-image
-              run: |
-                build_tag=$(./script/devops.sh build_image \
-                  --channel dev)
-                
-                echo "BUILD_TAG=${build_tag}" >> $GITHUB_ENV
-                echo "build_tag=${build_tag}" >> $GITHUB_OUTPUT
-              env:
-                APP_INSTALLER_FILE: ${{ vars.APP_INSTALLER_FILE }}
-                APP_FILE: ${{ vars.APP_FILE }}
-                APP_SETUP_ARGS: ${{ vars.APP_SETUP_ARGS }}
-                APP_ALIAS: ${{ vars.APP_ALIAS }}
+      - name: Fetch Artifact
+        run: |
+          ./script/devops.sh fetch_artifact \
+            --account-name "${{ vars.ARTIFACT_STORAGE_ACCOUNT }}" \
+            --account-key "${{ secrets.ARTIFACT_STORAGE_KEY }}" \
 
-            - name: Publish Image
-              run: |
-                build_tag="${{ env.BUILD_TAG }}"
+      - name: Build docker image
+        id: build-docker-image
+        run: |
+          build_tag=$(./script/devops.sh build_image \
+            --channel dev)
 
-                ./script/devops.sh publish_image \
-                  --tag "$build_tag" \
-                  --channel dev
-    
-    deploy_container_instance:
-        name: Deploy Container Instance
-        needs: [init, build_and_push_docker_image]
-        runs-on: ubuntu-latest
-        environment: ${{ needs.init.outputs.channel }}
-        if : |
-          !failure() && !cancelled() && 
-          (
-            (github.event_name != 'workflow_dispatch' && github.event.inputs.deploy_container == 'true')
-           || 
-            (github.event_name == 'push')
-          )
-        steps:
-          - name: Check out code from GitHub
-            uses: actions/checkout@v5
+          echo "BUILD_TAG=${build_tag}" >> $GITHUB_ENV
+          echo "build_tag=${build_tag}" >> $GITHUB_OUTPUT
+        env:
+          APP_INSTALLER_FILE: ${{ vars.APP_INSTALLER_FILE }}
+          APP_FILE: ${{ vars.APP_FILE }}
+          APP_SETUP_ARGS: ${{ vars.APP_SETUP_ARGS }}
+          APP_ALIAS: ${{ vars.APP_ALIAS }}
 
-          - name: OIDC Login to Azure
-            uses: azure/login@v2
-            with:
-              client-id: ${{ secrets.CICD_CLIENT_ID }}
-              tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-              subscription-id: ${{ secrets.SUBSCRIPTION_ID }}
+      - name: Publish Image
+        run: |
+          build_tag="${{ env.BUILD_TAG }}"
 
-          - name: Deploy Container Instance
-            id: task-deploy-container
-            run: |
-              ./script/devops.sh deploy_container_instance \
-                --tag "${{ github.event_name == 'workflow_dispatch' && github.event.inputs.image_tag || needs.build_and_push_docker_image.outputs.build_tag }}"
-            env:
-                APP_LOG_FILE: ${{ vars.APP_LOG_FILE }}
-    deploy_function_app:
-        name: Deploy Function App
-        needs: [init]
-        runs-on: ubuntu-latest
-        environment: ${{ needs.init.outputs.channel }}
-        if : |
-          !failure() && !cancelled() && 
-          (
-            (github.event_name != 'workflow_dispatch' && github.event.inputs.deploy_function == 'true')
-           || 
-            (github.event_name == 'push')
-          )
-        steps:
-          - name: Check out code from GitHub
-            uses: actions/checkout@v5
+          ./script/devops.sh publish_image \
+            --tag "$build_tag" \
+            --channel dev
 
-          - name: OIDC Login to Azure
-            uses: azure/login@v2
-            with:
-              client-id: ${{ secrets.CICD_CLIENT_ID }}
-              tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-              subscription-id: ${{ secrets.SUBSCRIPTION_ID }}
+  deploy_container_instance:
+    name: Deploy Container Instance
+    needs: [init, build_and_push_docker_image]
+    runs-on: ubuntu-latest
+    environment: ${{ needs.init.outputs.channel }}
+    if: |
+      !failure() && !cancelled() &&
+      (
+        (github.event_name != 'workflow_dispatch' && github.event.inputs.deploy_container == 'true')
+        ||
+        (github.event_name == 'push')
+      )
+    steps:
+      - name: Check out code from GitHub
+        uses: actions/checkout@v5
 
-          - name: Deploy Function App
-            id: task-deploy-function
-            run: |
-              ./script/devops.sh deploy_function_app
-            env:
-                SUBSCRIPTION_ID: ${{ secrets.SUBSCRIPTION_ID }}
+      - name: OIDC Login to Azure
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.CICD_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.SUBSCRIPTION_ID }}
+
+      - name: Deploy Container Instance
+        id: task-deploy-container
+        run: |
+          ./script/devops.sh deploy_container_instance \
+            --tag "${{ github.event_name == 'workflow_dispatch' && github.event.inputs.image_tag || needs.build_and_push_docker_image.outputs.build_tag }}"
+        env:
+          APP_LOG_FILE: ${{ vars.APP_LOG_FILE }}
+  deploy_function_app:
+    name: Deploy Function App
+    needs: [init]
+    runs-on: ubuntu-latest
+    environment: ${{ needs.init.outputs.channel }}
+    if: |
+      !failure() && !cancelled() &&
+      (
+        (github.event_name != 'workflow_dispatch' && github.event.inputs.deploy_function == 'true')
+        ||
+        (github.event_name == 'push')
+      )
+    steps:
+      - name: Check out code from GitHub
+        uses: actions/checkout@v5
+
+      - name: OIDC Login to Azure
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.CICD_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.SUBSCRIPTION_ID }}
+
+      - name: Deploy Function App
+        id: task-deploy-function
+        run: |
+          ./script/devops.sh deploy_function_app
+        env:
+          SUBSCRIPTION_ID: ${{ secrets.SUBSCRIPTION_ID }}

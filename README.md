@@ -236,8 +236,19 @@ Summary of the most relevant points:
 ## Testing
 
 ```bash
+# Run linters with pre-commit
+pre-commit run --hook-stage isort --all-files
+pre-commit run --hook-stage codespell --all-files
+pre-commit run --hook-stage yamllint --all-files
+pre-commit run --hook-stage check-executables-have-shebangs --all-files
+pre-commit run --hook-stage manual python-typing-update --all-files
+
 # Run linters outside of pre-commit
+isort .
+ruff check --fix
+ruff format
 codespell
+yamllint .
 shellcheck -x ./script/*.sh
 ```
 
