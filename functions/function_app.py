@@ -56,13 +56,18 @@ async def read_job_config(container_name, blob_name):
     try:
         connection_string = os.environ.get('APP_STORAGE_CONNECTION')
 
-        # Create blob client from connection string
+        # Initialize async BlobServiceClient
         blob_service_client = BlobServiceClient.from_connection_string(connection_string)
-        blob_client = blob_service_client.get_blob_client(container=container_name, blob=blob_name)
 
-       # Read contents as json
-        raw_contents = blob_client.download_blob().readall()
-        data = json.loads(raw_contents)
+        async with blob_service_client:
+            blob_client = blob_service_client.get_blob_client(
+                container=container_name, blob=blob_name
+            )
+            # Read contents as json
+            download_stream = await blob_client.download_blob()
+            raw_contents = await download_stream.readall()
+            data = json.loads(raw_contents)
+            
         return data
     except Exception as e:
         logging.error(f"Error reading blob: {str(e)}")
