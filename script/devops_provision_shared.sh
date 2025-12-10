@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #########################################################################
 # Onboard and manage shared cloud infrastructure.
-# Usage: devops_provision_shared.sh 
+# Usage: devops_provision_shared.sh
 # Globals:
 #   SUBSCRIPTION_ID
 #   ENVIRONMENT
@@ -192,7 +192,7 @@ provision_container_registry(){
                 --tags "$tags" \
                 --only-show-errors 2>&1)
             set -e
-            
+
             if [ "$debug" -eq 1 ]; then
                 echo "$results" >> "${project_root}/.deploy_log/az_acr_create.json"
             fi
@@ -224,9 +224,9 @@ provision_container_registry(){
         echo "# devops_provision_shared.sh Container Registry Provision output variables"
         echo "# Generated on ${isa_date_utc}"
         echo "CONTAINER_REGISTRY_NAME=$container_registry_name"
-        
+
     }>> "$env_file"
-    
+
 
     # Configure Repo Permissions
 
@@ -242,7 +242,7 @@ provision_container_registry(){
         if [[ $exit_code -eq 0 && -n "$resource" ]]; then
             echo "$container_registry_username already exists" >&2
         else
-    
+
             set +e
             results=$(az acr token create \
                 --name "$container_registry_username" \
@@ -319,7 +319,7 @@ provision_monitoring(){
                 --tags "$tags" \
                 --only-show-errors 2>&1)
             set -e
-            
+
             if [ "$debug" -eq 1 ]; then
                 echo "$results" >> "${project_root}/.deploy_log/az_monitor_loganalytics_workspace_create.json"
             fi
@@ -349,7 +349,7 @@ provision_monitoring(){
                 echo "LOG_ANALYTICS_ID=\"$LOG_ANALYTICS_ID\""
             }>> "$env_file"
         fi
-       
+
     else
         echo "LOG_ANALYTICS_ID already exists" >&2
     fi
@@ -370,7 +370,7 @@ provision_key_vault(){
         if [[ $exit_code -eq 0 && -n "$resource" ]]; then
             echo "$key_vault_name already exists" >&2
         else
-            
+
             set +e
             results=$(az keyvault create \
                 --name "$key_vault_name" \
@@ -431,14 +431,14 @@ save_outputs_to_keyvault(){
     # Loop through secrets and set each one
     for secret_name in "${!secrets[@]}"; do
         secret_value="${secrets[$secret_name]}"
-        
+
         if [[ -z "$secret_value" ]]; then
             echo "  Skipping $secret_name — value is empty"
             continue
         fi
 
         echo "  Setting secret: $secret_name"
-       
+
         set +e
         results=$(az keyvault secret set \
             --vault-name "$key_vault_name" \
@@ -446,7 +446,7 @@ save_outputs_to_keyvault(){
             --value "$secret_value" \
             --only-show-errors 2>&1)
         set -e
-        
+
         if [ "$debug" -eq 1 ]; then
             echo "$results" >> "${project_root}/.deploy_log/az_keyvault_secret_set_$secret_name.json"
         fi
@@ -459,7 +459,7 @@ save_outputs_to_keyvault(){
         fi
 
         echo "  Secret $secret_name set successfully."
-        
+
     done
 
     echo "Output variables saved to Key Vault ${key_vault_name}" >&2

@@ -1,9 +1,11 @@
 # FROM openjdk:21-slim-bullseye
 FROM mcr.microsoft.com/openjdk/jdk:21-ubuntu
 
+# hadolint ignore=SC2016
 RUN echo 'alias ll='"'"'ls $LS_OPTIONS -al'"'"'' >> ~/.bashrc
 
 # Install dependencies
+# hadolint ignore=DL3008
 RUN apt-get update && apt-get install -y --no-install-recommends \
         jq \
         vim \
@@ -21,7 +23,7 @@ ENV RELEASE_VERSION=${RELEASE_VERSION} \
     APP_FILE=${APP_FILE} \
     APP_SETUP_ARGS=${APP_SETUP_ARGS} \
     APP_ALIAS=${APP_ALIAS} \
-    DEBIAN_FRONTEND=noninteractive 
+    DEBIAN_FRONTEND=noninteractive
 
 # Set working directory
 WORKDIR /app
@@ -29,16 +31,13 @@ WORKDIR /app
 # Copy application files
 COPY .artifact_cache/* /app
 
-# Install binary
-RUN chmod +x /app/${APP_INSTALLER_FILE}
-RUN ./$APP_INSTALLER_FILE
-RUN rm -f /app/${APP_INSTALLER_FILE}
-
-# Run setup task
-RUN ${APP_FILE} $APP_SETUP_ARGS
-
-# Set symnlink
-RUN ln -s "${APP_FILE}" "/usr/local/bin/$APP_ALIAS"
+# Install binary + setup + symlink
+RUN set -eux; \
+    chmod +x "/app/${APP_INSTALLER_FILE}"; \
+    "/app/${APP_INSTALLER_FILE}"; \
+    rm -f "/app/${APP_INSTALLER_FILE}"; \
+    "${APP_FILE}" ${APP_SETUP_ARGS}; \
+    ln -s "${APP_FILE}" "/usr/local/bin/${APP_ALIAS}"
 
 COPY ./pipeline_app/entrypoint.sh ./pipeline_app/build_args.sh /app/
 

@@ -43,7 +43,7 @@ assign_role(){
     local scope=$3
     local app_sp_id=$4
     local role_id
-    
+
     # Get Custom role ID
     role_id=$(az role definition list \
         --name "$role_name" \
@@ -262,7 +262,7 @@ done
 response=$(az ad app federated-credential list --id "$app_id")
 if [[ $response == '[]' ]]; then
     echo "No existing federated identity credentials found." >&2
-        
+
     echo "Adding OIDC federated identity credentials to the app registration..." >&2
     post_body="{\"name\":\"$app_secret_name\","
     post_body=$post_body'"issuer":"https://token.actions.githubusercontent.com",'

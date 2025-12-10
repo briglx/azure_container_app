@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #########################################################################
 # Onboard and manage application on cloud infrastructure.
-# Usage: devops_provision.sh 
+# Usage: devops_provision.sh
 # Globals:
 #   SUBSCRIPTION_ID
 #   ENVIRONMENT
@@ -72,12 +72,12 @@ app_storage_account_name="${app_storage_account_name:0:24}"
 eventgrid_system_topic_name="evgst-${short_name}-pri-strg-${short_env}"
 eventgrid_system_topic_name=$(echo "$eventgrid_system_topic_name" | tr '[:upper:]' '[:lower:]')
 eventgrid_system_topic_name="${eventgrid_system_topic_name//[^a-z0-9]/}"
-eventgrid_system_topic_name="${eventgrid_system_topic_name:0:24}"  
+eventgrid_system_topic_name="${eventgrid_system_topic_name:0:24}"
 
 eventgrid_event_subscription_name="evgs-${short_name}-blob2func-${short_env}"
 eventgrid_event_subscription_name=$(echo "$eventgrid_event_subscription_name" | tr '[:upper:]' '[:lower:]')
 eventgrid_event_subscription_name="${eventgrid_event_subscription_name//[^a-z0-9]/}"
-eventgrid_event_subscription_name="${eventgrid_event_subscription_name:0:24}" 
+eventgrid_event_subscription_name="${eventgrid_event_subscription_name:0:24}"
 
 if [ -z "$APP_STORAGE_CONTAINER" ]; then
     APP_STORAGE_CONTAINER="pipeline-files"

@@ -27,7 +27,7 @@ log_error() {
     if [[ $log_level -ge $LOG_ERROR ]]; then
         echo -e "$(get_timestamp) ${RED}[ERROR]${NC} $*" >&2
     fi
-    
+
 }
 
 log_debug() {
@@ -209,7 +209,7 @@ upload_artifact(){
     set -e
 
     log_debug "$result"
-    
+
     # Save file if LOG_DEBUG is enabled
     if [[ $log_level -ge $LOG_DEBUG ]]; then
         log_debug "Saving result to az_storage_blob_upload.log."
@@ -230,9 +230,9 @@ upload_artifact(){
         log_error "$result"
         exit 1
     fi
-    
-    log_info "Successfully uploaded artifact." 
-    log_debug "Successfully uploaded artifact ${artifact_name} uploaded to ${account_name}/${container_name}/${target_name}." 
+
+    log_info "Successfully uploaded artifact."
+    log_debug "Successfully uploaded artifact ${artifact_name} uploaded to ${account_name}/${container_name}/${target_name}."
 
 }
 
@@ -287,7 +287,7 @@ fetch_artifact(){
 
     artifact_sas_token="$result"
     artifact_path="https://${account_name}.blob.core.windows.net/${container_name}/${artifact_name}"
-    
+
     # Create temp directory and download artifact
     log_info "Downloading artifact."
     log_debug "Downloading artifact from ${artifact_path} to temp.zip."
@@ -298,8 +298,8 @@ fetch_artifact(){
     unzip -qo "temp.zip" -d .artifact_cache
     rm -f "temp.zip"
 
-    log_info "Successfully fetched artifact." 
-    log_debug "Successfully fetched artifact from ${account_name}/${container_name}/${artifact_name}." 
+    log_info "Successfully fetched artifact."
+    log_debug "Successfully fetched artifact from ${account_name}/${container_name}/${artifact_name}."
 
 }
 
@@ -319,12 +319,12 @@ get_keyvault_secret() {
         log_error "Failed to retrieve secret '$secret_name' from vault '$vault_name'"
         return 2
     fi
-    
+
     if [[ -z "$secret_value" ]]; then
         log_error "Secret '$secret_name' is empty in vault '$vault_name'"
         return 2
     fi
-    
+
     echo "$secret_value"
 }
 
@@ -665,7 +665,7 @@ deploy_function_app(){
     local destination_dir="${PROJECT_ROOT}/.dist"
     local zip_file_name="${SHORT_NAME}_functions_${ENVIRONMENT}_${BUILD_NUMBER}.zip"
     local zip_file_path="${destination_dir}/${zip_file_name}"
-    
+
     # Create the destination directory if it doesn't exist
     mkdir -p "$(dirname "$zip_file_path")"
 
@@ -688,7 +688,7 @@ deploy_function_app(){
     set -e
 
     popd
-    
+
     # Save file if LOG_DEBUG is enabled
     if [[ $log_level -ge $LOG_DEBUG ]]; then
         log_debug "Saving result to az_functionapp_deployment_source_config_zip.json."

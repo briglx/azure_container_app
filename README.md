@@ -269,13 +269,20 @@ Summary of the most relevant points:
 ```bash
 # Run linters with pre-commit
 pre-commit run --hook-stage manual isort --all-files
-pre-commit run --hook-stage manual codespell --all-files
+pre-commit run --hook-stage manual ruff-check --all-files
 pre-commit run --hook-stage manual yamllint --all-files
-pre-commit run --hook-stage manual check-executables-have-shebangs --all-files
-pre-commit run --hook-stage manual check-docstring-first --all-files
-pre-commit run --hook-stage manual check-json --all-files
-pre-commit run --hook-stage manual prettier --all-files
 
+pre-commit run --hook-stage manual check-shebang-scripts-are-executable --all-files
+pre-commit run --hook-stage manual check-executables-have-shebangs --all-files
+pre-commit run --hook-stage manual check-toml --all-files
+pre-commit run --hook-stage manual check-json --all-files
+pre-commit run --hook-stage manual end-of-file-fixer --all-files --show-diff-on-failure
+pre-commit run --hook-stage manual fix-byte-order-marker --all-files --show-diff-on-failure
+pre-commit run --hook-stage manual mixed-line-ending --all-files --show-diff-on-failure
+pre-commit run --hook-stage manual trailing-whitespace --all-files --show-diff-on-failure
+pre-commit run --hook-stage manual codespell --all-files --show-diff-on-failure
+pre-commit run --hook-stage manual shellcheck --all-files --show-diff-on-failure
+pre-commit run --hook-stage manual hadolint-docker --all-files --show-diff-on-failure
 
 # Run linters outside of pre-commit
 isort .
@@ -284,6 +291,7 @@ ruff format
 codespell
 yamllint .
 shellcheck -x ./script/*.sh
+docker run --rm -i hadolint/hadolint < Dockerfile
 ```
 
 # Notes

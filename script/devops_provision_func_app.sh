@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #########################################################################
 # Deploy function app resources on cloud infrastructure.
-# Usage: devops_provision_func_app.sh 
+# Usage: devops_provision_func_app.sh
 # Globals:
 #   SUBSCRIPTION_ID
 #   ENVIRONMENT
@@ -125,7 +125,7 @@ set -e
 if [[ $exit_code -eq 0 && -n "$resource" ]]; then
     echo "$funcapp_name already exists" >&2
 else
-    
+
     az functionapp create \
         --resource-group "$rg_name" \
         --name "$funcapp_name" \

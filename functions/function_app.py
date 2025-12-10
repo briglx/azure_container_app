@@ -57,7 +57,7 @@ async def read_job_config(container_name, blob_name):
             raw_contents = await download_stream.readall()
             return json.loads(raw_contents)
 
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:  # pylint: disable=W0718 # noqa: BLE001
         logger.error("Error reading blob: %s", str(e))
 
 
@@ -89,7 +89,7 @@ async def check_azure_file(connection_string, container_name, file_path):
         )
         return await blob_client.exists()
 
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:  # pylint: disable=W0718 # noqa: BLE001
         logger.error("Error checking blob %s: %s", file_path, e)
         return False
 
@@ -191,3 +191,5 @@ async def event_grid_test(event: func.EventGridEvent):
 
     if all_found:
         logger.info("All required files are present. Proceeding with processing...")
+    else:
+        logger.error("Some required files are missing. Aborting processing...")

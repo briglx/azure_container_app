@@ -24,6 +24,7 @@ repos:
       - id: check-shebang-scripts-are-executable
       - id: check-executables-have-shebangs
         stages: [manual]
+      - id: check-toml
       - id: check-json
         exclude: (.vscode|.devcontainer)
       - id: end-of-file-fixer
@@ -40,3 +41,23 @@ repos:
           - '--quiet-level=2'
         exclude_types: [csv, json]
         exclude: ^tests/fixtures/|tests/components/.*/snapshots/
+
+  - repo: https://github.com/hadolint/hadolint
+    rev: v2.12.0
+    hooks:
+      - id: hadolint-docker
+
+  - repo: local
+    hooks:
+      - id: shellcheck
+        name: shellcheck
+        entry: script/pre_commit_shellcheck.sh
+        language: script
+        exclude_types: [json, sql, toml, yaml]
+        files: ^(script|iac)/.+sh$
+      - id: pylint
+        name: pylint
+        entry: script/run_in_env.sh pylint -j 0
+        language: script
+        types: [python]
+        files: ^functions/.+\.py$

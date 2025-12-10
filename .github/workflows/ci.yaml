@@ -170,25 +170,6 @@ jobs:
           fail-on-cache-miss: true
           key: *key-pre-commit-env
 
-      - name: Run isort
-        run: |
-          . venv/bin/activate
-          pre-commit run --hook-stage manual isort --all-files --show-diff-on-failure
-
-      - name: Run ruff-format
-        run: |
-          . venv/bin/activate
-          pre-commit run --hook-stage manual ruff-format --all-files --show-diff-on-failure
-        env:
-          RUFF_OUTPUT_FORMAT: github
-
-      - name: Run ruff-check
-        run: |
-          . venv/bin/activate
-          pre-commit run --hook-stage manual ruff-check --all-files --show-diff-on-failure
-        env:
-          RUFF_OUTPUT_FORMAT: github
-
       - name: Register yamllint problem matcher
         run: |
           echo "::add-matcher::.github/workflows/matchers/yamllint.json"
@@ -206,6 +187,11 @@ jobs:
         run: |
           . venv/bin/activate
           pre-commit run --hook-stage manual check-executables-have-shebangs --all-files --show-diff-on-failure
+
+      - name: Run toml
+        run: |
+          . venv/bin/activate
+          pre-commit run --hook-stage manual check-toml --all-files --show-diff-on-failure
 
       - name: Run check-json
         run: |
@@ -235,6 +221,15 @@ jobs:
           . venv/bin/activate
           pre-commit run --hook-stage manual trailing-whitespace --all-files --show-diff-on-failure
 
+      - name: Python Lint
+        id: python-lint
+        run: |
+          . venv/bin/activate
+          pre-commit run --hook-stage manual isort --all-files --show-diff-on-failure
+          pre-commit run --hook-stage manual ruff-format --all-files --show-diff-on-failure
+          pre-commit run --hook-stage manual ruff-check --all-files --show-diff-on-failure
+          pre-commit run --hook-stage manual pylint --all-files --show-diff-on-failure
+
       - name: Register codespell problem matcher
         run: |
           echo "::add-matcher::.github/workflows/matchers/codespell.json"
@@ -245,7 +240,15 @@ jobs:
 
       - name: Shell check
         run: |
-          shellcheck -x ${{ github.workspace }}/script/*.sh
+          pre-commit run --hook-stage manual shellcheck --all-files --show-diff-on-failure
+
+      - name: Register hadolint problem matcher
+        run: |
+          echo "::add-matcher::.github/workflows/matchers/hadolint.json"
+      - name: Check Dockerfile
+        run: |
+          . venv/bin/activate
+          pre-commit run --hook-stage manual codespell --all-files --show-diff-on-failure
 
   build_and_push_docker_image:
     needs: [info, lint]
