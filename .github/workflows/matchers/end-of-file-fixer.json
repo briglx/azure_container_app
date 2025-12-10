@@ -1,11 +1,14 @@
 {
-    "owner": "end-of-file-fixer",
-    "pattern": [
+    "problemMatcher": [
         {
-            "regexp": "^Fixing\\s+(.+)$",
-            "file": 1,
-            "message": 0,
-            "severity": "warning"
+            "owner": "end-of-file-fixer",
+            "severity": "warning",
+            "pattern": [
+                {
+                    "regexp": "^Fixing\\s+(.+)$",
+                    "file": 1
+                }
+            ]
         }
     ]
 }
