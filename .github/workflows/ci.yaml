@@ -240,6 +240,7 @@ jobs:
 
       - name: Shell check
         run: |
+          . venv/bin/activate
           pre-commit run --hook-stage manual shellcheck --all-files --show-diff-on-failure
 
       - name: Register hadolint problem matcher
