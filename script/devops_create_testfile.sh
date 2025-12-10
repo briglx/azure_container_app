@@ -28,8 +28,6 @@ fi
 # Globals
 project_root="$(git rev-parse --show-toplevel)"
 short_name=$(grep -oP '(?<=^short_name = ")[^"]+' "${project_root}/pyproject.toml"  | tr -d '\n')
-version=$(grep -oP '(?<=^version = ")[^"]+' "${project_root}/pyproject.toml"  | tr -d '\n')
-
 short_env=$(echo "${ENVIRONMENT:0:1}" | tr '[:upper:]' '[:lower:]')
 
 # Variables
@@ -43,7 +41,6 @@ app_storage_account_name="${app_storage_account_name:0:24}"
 # Create test file
 epoch_time=$(date +%s)
 timestamp=$(date -u -d "@${epoch_time}" +'%Y%m%d%H%M%SZ')
-json_date=$(date -u -d "@${epoch_time}" +"%Y-%m-%dT%H:%M:%SZ")
 test_file="test_job_config_${timestamp}.json"
 touch "$test_file"
 jq -n \
