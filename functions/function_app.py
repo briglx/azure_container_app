@@ -7,12 +7,95 @@ import os
 from pathlib import Path
 
 import azure.functions as func
+from azure.identity import ClientSecretCredential, DefaultAzureCredential
+from azure.mgmt.containerinstance import ContainerInstanceManagementClient
 from azure.storage.blob.aio import BlobServiceClient
 
 app = func.FunctionApp()
 
 
+# Configure Logging
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
+
+# Silence Azure SDK noise
+logging.getLogger("azure").setLevel(logging.WARNING)
+logging.getLogger("azure.identity").setLevel(logging.WARNING)
+logging.getLogger("azure.core").setLevel(logging.WARNING)
+
 logger = logging.getLogger(__name__)
+
+
+# pylint: disable=R0902
+class Settings:
+    """Centralized configuration management."""
+
+    def __init__(self):
+        """Initialize settings from environment variables."""
+        # Azure Auth & Location
+        self.tenant_id = os.environ.get("AZURE_TENANT_ID")
+        self.subscription_id = os.environ.get("SUBSCRIPTION_ID")
+        self.location = os.environ.get("LOCATION")
+        self.client_id = os.environ.get("CICD_CLIENT_ID")
+        self.client_secret = os.environ.get("CICD_CLIENT_SECRET")
+
+        # Resources
+        self.environment = os.environ.get("ENVIRONMENT")
+        self.keyvault_name = os.environ.get("KEY_VAULT_NAME")
+        self.rg_name = os.environ.get("RG_NAME", "rg-azcntnrapp-stage-westus3")
+        self.container_group_name = os.environ.get(
+            "CONTAINER_GROUP_NAME", "acg-azcntnrapp-ondemand-s"
+        )
+        self.storage_account_name = os.environ.get(
+            "APP_STORAGE_ACCOUNT_NAME", "stazcntnrappprimarys"
+        ).lower()
+
+        # Application Paths (Defaults)
+        self.app_runtime_config = os.environ.get(
+            "APP_RUNTIME_CONFIG_FILE", "/mnt/azurefiles/runtime-config.json"
+        )
+        self.app_export_config = os.environ.get(
+            "APP_EXPORT_CONFIG_FILE", "/mnt/azurefiles/input/file2.txt"
+        )
+        self.app_stats_config = os.environ.get(
+            "APP_STATS_CONFIG_FILE", "/mnt/azurefiles/stats-config.json"
+        )
+        self.app_log_file = os.environ.get("APP_LOG_FILE", "/path/to/log")
+
+    @property
+    def keyvault_url(self) -> str:
+        """Constructs the Key Vault URL."""
+        return f"https://{self.keyvault_name}.vault.azure.net"
+
+    def validate(self):
+        """Ensure required variables are present."""
+        required_vars = [
+            self.subscription_id,
+            self.environment,
+            self.location,
+            self.keyvault_name,
+        ]
+        if not all(required_vars):
+            raise ValueError("Missing required environment variables")
+
+
+def get_credential(settings: Settings):
+    """Return the appropriate Azure credential.
+
+    Prioritizes explicit Service Principal if vars are present,
+    otherwise falls back to DefaultAzureCredential.
+    """
+    if settings.tenant_id and settings.client_id and settings.client_secret:
+        logger.info("Using ClientSecretCredential with provided environment variables.")
+        return ClientSecretCredential(
+            tenant_id=settings.tenant_id,
+            client_id=settings.client_id,
+            client_secret=settings.client_secret,
+        )
+
+    logger.info("Using DefaultAzureCredential (Environment, Managed Identity, or CLI).")
+    return DefaultAzureCredential()
 
 
 async def read_azure_file(connection_string, container_name, file_path):
@@ -191,5 +274,29 @@ async def event_grid_test(event: func.EventGridEvent):
 
     if all_found:
         logger.info("All required files are present. Proceeding with processing...")
+
+        settings = Settings()
+        settings.validate()
+
+        # Proceed with further processing here
+        logger.info("Authenticating to Azure...")
+        credential = get_credential(settings)
+
+        # Initialize Clients
+        logger.info("Initializing Azure Container Instance client...")
+        aci_client = ContainerInstanceManagementClient(
+            credential, settings.subscription_id
+        )
+
+        logger.info(
+            "Starting Container Group: %s in Resource Group: %s...",
+            settings.container_group_name,
+            settings.rg_name,
+        )
+        aci_client.container_groups.begin_start(
+            resource_group_name=settings.rg_name,
+            container_group_name=settings.container_group_name,
+        )
+
     else:
         logger.error("Some required files are missing. Aborting processing...")

@@ -421,3 +421,4 @@ az eventgrid system-topic event-subscription create \
 # References
 * Built in Azure Roles https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles
 * Azure Permissions https://learn.microsoft.com/en-us/azure/role-based-access-control/resource-provider-operations
+* Azure REST API - Container Group https://learn.microsoft.com/en-us/rest/api/container-instances/container-groups/create-or-update?view=rest-container-instances-2025-09-01&tabs=HTTP
