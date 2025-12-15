@@ -90,18 +90,18 @@ jobs:
           fi
 
           echo "channel=staging" >> $GITHUB_OUTPUT
-
-      - name: Generate partial pre-commit restore key
-        id: generate_pre-commit_cache_key
-        run: >-
-          echo "key=pre-commit-${{ env.CACHE_VERSION }}-${{
-            hashFiles('.pre-commit-config.yaml') }}"  >> $GITHUB_OUTPUT
       - name: Generate partial Python venv restore key
         id: generate_python_cache_key
         run: >-
           echo "key=venv-${{ env.CACHE_VERSION }}-${{
             hashFiles('requirements.txt') }}-${{
             hashFiles('requirements_dev.txt') }}" >> $GITHUB_OUTPUT
+      - name: Generate partial pre-commit restore key
+        id: generate_pre-commit_cache_key
+        run: >-
+          echo "key=pre-commit-${{ env.CACHE_VERSION }}-${{
+            hashFiles('.pre-commit-config.yaml') }}"  >> $GITHUB_OUTPUT
+
   pre-commit:
     name: Prepare pre-commit base
     runs-on: *runs-on-ubuntu
@@ -117,12 +117,12 @@ jobs:
           check-latest: true
       - name: Restore base Python virtual environment
         id: cache-venv
-        uses: &actions-cache actions/cache@v4.3.0
+        uses: &actions-cache actions/cache@v5.0.1
         with:
           path: venv
           key: &key-pre-commit-venv >-
             ${{ runner.os }}-${{ steps.python.outputs.python-version }}-venv-${{
-              needs.info.outputs.pre-commit_cache_key }}
+              needs.info.outputs.python_chache_key }}
       - name: Create Python virtual environment
         if: steps.cache-venv.outputs.cache-hit != 'true'
         run: |
