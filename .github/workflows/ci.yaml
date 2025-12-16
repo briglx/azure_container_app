@@ -247,9 +247,9 @@ jobs:
         run: |
           echo "::add-matcher::.github/workflows/matchers/hadolint.json"
       - name: Check Dockerfile
-        run: |
-          . venv/bin/activate
-          pre-commit run --hook-stage manual codespell --all-files --show-diff-on-failure
+        uses: hadolint/hadolint-action@master
+        with:
+          dockerfile: "pipeline_app/Dockerfile"
 
   build_and_push_docker_image:
     needs: [info, lint]

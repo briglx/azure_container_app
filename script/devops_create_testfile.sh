@@ -25,6 +25,7 @@ if [ -z "$LOCATION" ]; then
     LOCATION="westus3"
 fi
 
+
 # Globals
 project_root="$(git rev-parse --show-toplevel)"
 short_name=$(grep -oP '(?<=^short_name = ")[^"]+' "${project_root}/pyproject.toml"  | tr -d '\n')
@@ -60,6 +61,25 @@ jq -n \
       "path/to/secondary_source/file",
       ("incoming/test_job_config_" + $timestamp + ".json"),
       "incoming/emptyfile"
+    ]
+  }' > "${test_file}"
+
+# Validate test file
+jq -n \
+    --arg runtime_config "/mnt/azurefiles/runtime-config.json" \
+    --arg export_config "/mnt/azurefiles/input/file2.txt" \
+    --arg stats_config "/mnt/azurefiles/stats-config.json" \
+    --arg log_file "/path/to/log" \
+    --arg timestamp "${timestamp}" \
+  '{
+    env_vars: [
+      {name: "APP_RUNTIME_CONFIG_FILE", value: $runtime_config},
+      {name: "APP_EXPORT_CONFIG_FILE", value: $export_config},
+      {name: "APP_STATS_CONFIG_FILE", value: $stats_config},
+      {name: "APP_LOG_FILE", value: $log_file}
+    ],
+    files: [
+      ("incoming/test_job_config_" + $timestamp + ".json")
     ]
   }' > "${test_file}"
 

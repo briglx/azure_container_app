@@ -42,4 +42,5 @@ RUN set -eux; \
 COPY ./pipeline_app/entrypoint.sh ./pipeline_app/build_args.sh /app/
 
 # ENTRYPOINT [ "./entrypoint.sh" ]
-CMD ["tail", "-f", "/dev/null"]
+# CMD ["tail", "-f", "/dev/null"]
+CMD [ "/bin/sh", "-c", "echo Starting run ..." ]
