@@ -70,6 +70,7 @@ jobs:
           if [[ "$EVENT_NAME" == "workflow_dispatch" && -n "$WORKFLOW_TARGET" ]]; then
             TARGET="$WORKFLOW_TARGET"
             echo "Using workflow dispatch target: $TARGET"
+            echo "channel=$TARGET" >> $GITHUB_OUTPUT
           else
             # Set environment based on branch
             case "$REF_NAME" in
@@ -87,9 +88,9 @@ jobs:
                 ;;
             esac
             echo "Detected branch: $REF_NAME, setting target: $TARGET"
+            echo "channel=$TARGET" >> $GITHUB_OUTPUT
           fi
 
-          echo "channel=staging" >> $GITHUB_OUTPUT
       - name: Generate partial Python venv restore key
         id: generate_python_cache_key
         run: >-
