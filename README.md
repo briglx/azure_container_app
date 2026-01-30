@@ -175,6 +175,42 @@ version=$(./script/devops.sh build_image \
     --debug
 ```
 
+### Update Artifact File
+Sometimes there may be a single file that needs to be updated in the artifacts. This would trigger the build and deploy process.
+
+* Upload `$ARTIFACT_NAME` to `$ARTIFACT_STORAGE_ACCOUNT $ARTIFACT_CONTAINER`
+* Github Action `CI` Workflow
+  * Select `Build and Push Docker`
+
+```bash
+# Upload $ARTIFACT_NAME to $ARTIFACT_STORAGE_ACCOUNT $ARTIFACT_CONTAINER
+
+#
+
+# Download your binary that needs to be deployed in the container as ARTIFACT_NAME.
+curl /path/to/files -o "$ARTIFACT_NAME"
+
+# Upload to a shared artifact location in blob storage
+local_file="/path/to/$ARTIFACT_NAME"
+target_file="${ARTIFACT_FOLDER}/${ARTIFACT_NAME}"
+./script/devops.sh upload_artifact \
+    --file "$local_file" \
+    --account-name "$ARTIFACT_STORAGE_ACCOUNT" \
+    --account-key "$ARTIFACT_STORAGE_ACCOUNT_KEY" \
+    --container-name "$ARTIFACT_CONTAINER" \
+    --name "$target_file"
+
+# Or with defaults
+./script/devops.sh upload_artifact \
+    --file "$local_file" \
+    --account-name "$ARTIFACT_STORAGE_ACCOUNT" \
+    --account-key "$ARTIFACT_STORAGE_ACCOUNT_KEY"
+
+# Then Build and Deploy the Pipeline app
+
+```
+
+
 ## Build and Deploy the Function App
 ```bash
 ./script/devops.sh deploy_function_app \
